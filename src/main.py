@@ -42,10 +42,13 @@ KEY_a = 97
 KEY_s = 115
 KEY_d = 100
 KEY_w = 119
+KEY_p = 112
+
 KEY_A = 65
 KEY_S = 83
 KEY_D = 68
 KEY_W = 87
+KEY_P = 80
 KEY_ENTER = 13
 KEY_SPACE = 32
 
@@ -175,7 +178,7 @@ def onKeyPressed(e):
     global charLastKey
     
     key = e.KeyID
-    charLastKey = chr(e.Ascii)
+    charLastKey = chr(e.Ascii) # Useless atm.
     #print(key)
     
     if isInMenu:
@@ -419,7 +422,17 @@ def renderPlayer(window):
 
 # Metodo para activar el teclado en modo jugador
 def inputPlayer(key):
-    global playerX, playerY, enterPressed, isClimbing, canJump, isJumping, jumpTimer, canClimb
+    global playerX, playerY, enterPressed, isClimbing, canJump, isJumping, jumpTimer, canClimb, isPaused
+    
+    # Primero chequeamos si se pauso el juego, para asi saltar todo este codigo
+    if key == KEY_p or key == KEY_P:
+        # Invertimos el valor de isPaused
+        isPaused = not(isPaused)
+        
+        # Si al invertirlo es TRUE, quiere decir que el juego esta pausado, saltamos todo este codigo
+        if isPaused:
+            return
+    
     
     if (key == KEY_d or key == KEY_D or key == KEY_RIGHT) and not (isClimbing):
         playerX += speedX           
@@ -441,7 +454,7 @@ def inputPlayer(key):
         canJump = False           
         isJumping = True
         canClimb = False
-        jumpTimer = time.time() # Parametro para el seno
+        jumpTimer = time.time() # Parametro para el seno 
     
         
     if key == KEY_ENTER:
@@ -554,12 +567,17 @@ def renderGame(window):
     # Pintamos los monstruos
     renderMonsters(window)
     
+    # Si esta pausado el juego, pintamos un Texto que nos lo diga
+    if isPaused:
+        drawString(250, 200, "PAUSE", "white", 80, window)
+    
     
 # Actualizar el juego (cuando se esta jugando)
 def tickGame():
-    tickMonsters()
-    tickPlayer()
-
+    # Actualizamos solo si el juego no esta pausado
+    if not isPaused:
+        tickMonsters()
+        tickPlayer()
 
 
 
