@@ -17,12 +17,12 @@ MENU_EXIT = 2
 MAX_OPTIONS = 2
 
 # Propiedades del menu
-# Para crear una opcion nueva es igual que los monstruos, se anade 1 item a cada arreglo de opciones 
-# se modifica arriba MAX_OPTIONS, y se anade la opcion nueva 
+# Para crear una opcion nueva es igual que los monstruos, se anade 1 item a cada arreglo de opciones
+# se modifica arriba MAX_OPTIONS, y se anade la opcion nueva
 
-selectedOption = 1             # Opcion seleccionada por defecto
-selectedOptionY = 230          # Altura del triangulo que funciona como cursor en el menu
-distanceBetweenOptions = 100   # Distancia entre cada opcion del menu (para mover el triangulo)
+selectedOption = 1 # Opcion seleccionada por defecto
+selectedOptionY = 230 # Altura del triangulo que funciona como cursor en el menu
+distanceBetweenOptions = 100 # Distancia entre cada opcion del menu (para mover el triangulo)
 
 optionNames = ["Jugar", "Salir"]
 optionXCoords = [320, 320]
@@ -57,7 +57,7 @@ KEY_SPACE = 32
 
 
 
-# Estaticas 
+# Estaticas
 global mainComponent
 global window
 
@@ -180,7 +180,7 @@ mSpeedY = [1, 1]
 
 
 # Lectura de teclas presionadas
-def onKeyPressed(e):  
+def onKeyPressed(e):
     global charLastKey
     
     key = e.KeyID
@@ -194,15 +194,15 @@ def onKeyPressed(e):
 
     return True # Necesario para que el programa no se cierre al presionar una tecla
 
-keyManager = pyHook.HookManager()  # Creamos el objeto
-keyManager.KeyDown = onKeyPressed  # que maneja las
-keyManager.HookKeyboard()          # teclas presionadas
+keyManager = pyHook.HookManager() # Creamos el objeto
+keyManager.KeyDown = onKeyPressed # que maneja las
+keyManager.HookKeyboard() # teclas presionadas
 
 
 
 # Metodo para cargar una imagen
-def openImage(filePath):   
-    # Cargamos la imagen 
+def openImage(filePath):
+    # Cargamos la imagen
     image = PIL.Image.open(filePath)
     image.load()
     
@@ -239,14 +239,14 @@ def loadMap(filePath):
 
     # Recorremos todos los pixels de la imagen
     for y in range(0, iy):
-        for x in range(0, ix):   
-            # Obtenemos las componentes del vector RGB         
+        for x in range(0, ix):
+            # Obtenemos las componentes del vector RGB
             r, g, b = pixels[x, y]
 
             # Creamos el color RGB
             rgb = (r << 16) | (g << 8) | b
 
-            # Chequeamos si es el color          
+            # Chequeamos si es el color
             if (rgb & 0xFFFFFF) == 0: # Negro (Nada)
                 mapReaded.append(TILE_NONE)
             elif (rgb ^ 0xFFFFFF) == 0x00FF00: # Rosado (Piso)
@@ -254,8 +254,8 @@ def loadMap(filePath):
             elif (rgb ^ 0xFFFFFF) == 0xFF00FF: # Verde (Escaleras)
                 mapReaded.append(TILE_STAIRS)
             else:
-                mapReaded.append(TILE_NULL)  
-            # Faltan los otros colores....      
+                mapReaded.append(TILE_NULL)
+            # Faltan los otros colores....
             
     # Retornamos el mapa leido
     return mapReaded
@@ -263,18 +263,18 @@ def loadMap(filePath):
 
 
 # Metodo para obtener el valor del mapa en la posicion x,y
-def getMapValue(x, y):    
-    return map[getXMapValue(x) + getYMapValue(y) * mapWidth]   
+def getMapValue(x, y):
+    return map[getXMapValue(x) + getYMapValue(y) * mapWidth]
 
 
 # Metodo para obtener la X dentro del mapa
 def getXMapValue(x):
-    return int(math.fabs(x/blockSize))   
+    return int(math.fabs(x/blockSize))
 
 
 # Metodo para obtener la Y dentro del mapa
 def getYMapValue(y):
-    return int(math.fabs(y/blockSize))  
+    return int(math.fabs(y/blockSize))
 
 
 
@@ -327,7 +327,7 @@ def drawMap(window):
                 continue
             
             # Obtenemos la coordenada actual
-            actCoord =  map[x + y*mapWidth]
+            actCoord = map[x + y*mapWidth]
             
             # Creamos una variable para el color actual
             actColor = "black" # Por defecto negro
@@ -338,10 +338,10 @@ def drawMap(window):
             elif actCoord == TILE_STAIRS:
                 actColor = "brown"
             else:
-                actColor = "black"                        
+                actColor = "black"
 
-            # Pintamos el bloque    
-            drawRect(xOffset, yOffset, xOffset + blockSize, yOffset + blockSize, actColor, window)   
+            # Pintamos el bloque
+            drawRect(xOffset, yOffset, xOffset + blockSize, yOffset + blockSize, actColor, window)
             
             # Actualizamos los offset
             xOffset += blockSize # Podriamos tener 1 solo offset ya que son iguales
@@ -364,7 +364,6 @@ def tickPlayer():
     
     # Como todo aqui tiene que ver con escalar, si isJumping entonces saltamos todo este codigo
     if isJumping:
-        print(isJumping)
         return
     
     # Revisamos si esta parado sobre una escalera para permitirle subir (Con el observador en los pies, izquierda)
@@ -374,8 +373,8 @@ def tickPlayer():
         canClimb = False
     
     # Si esta subiendo y ya no puede subir, entonces es porque termino de subir y "se paso" de la escalera
-    # Por lo que hay que "bajarlo" al piso, para que pueda seguir moviendose    
-    if isClimbing and not canClimb: 
+    # Por lo que hay que "bajarlo" al piso, para que pueda seguir moviendose
+    if isClimbing and not canClimb:
         # Nueva posicion en funcion del mapa
         newYPos = getYMapValue(playerY)
         
@@ -384,7 +383,7 @@ def tickPlayer():
         if (getMapValue(playerX+(playerWidth/2), playerY) == TILE_NONE) and (getMapValue(playerX+(playerWidth/2), playerY+playerHeight+blockSize) == TILE_STAIRS):
             newYPos += 1
         
-        # Creo la nueva posicion para pintar 
+        # Creo la nueva posicion para pintar
         playerY = newYPos*blockSize
         isClimbing = False
     
@@ -411,7 +410,7 @@ def renderPlayer(window):
         jumpOffset = -math.sin(time.time() - jumpTimer) * jumpHeight
     
     # Si el offset de salto es positivo, quiere decir que termino el salto (grafica del seno entre 0 y pi)
-    # entonces, reseteo todos los valores para poder escalar y saltar de nuevo..   
+    # entonces, reseteo todos los valores para poder escalar y saltar de nuevo..
     if jumpOffset > 0:
         jumpOffset = 0
         canJump = True
@@ -420,10 +419,10 @@ def renderPlayer(window):
         
     
     # Pintamos el jugador
-    drawRect(playerX, playerY + jumpOffset, playerWidth, playerHeight + jumpOffset, "white", window)     
+    drawRect(playerX, playerY + jumpOffset, playerWidth, playerHeight + jumpOffset, "white", window)
     
     # Centro del jugador (Provisional)
-    drawRect(playerX, playerY + jumpOffset, 5, 5, "red", window)    
+    drawRect(playerX, playerY + jumpOffset, 5, 5, "red", window)
     
     drawString(playerX-(playerWidth/1.7), playerY+ jumpOffset-15, windowTitle, "white", 12, window)
     
@@ -444,7 +443,7 @@ def inputPlayer(key):
     
     
     if (key == KEY_d or key == KEY_D or key == KEY_RIGHT) and not (isClimbing):
-        playerX += speedX           
+        playerX += speedX
     elif (key == KEY_a or key == KEY_A or key == KEY_LEFT) and not (isClimbing):
         playerX -= speedX
     elif (key == KEY_s or key == KEY_S or key == KEY_DOWN) and (canClimb):
@@ -455,19 +454,19 @@ def inputPlayer(key):
         playerY -= speedY
         isClimbing = True
         canJump = False
-    else:
+    elif not isClimbing:
         canJump = True
         
     # Si va a saltar, le prohibo que escale y salte nuevamente hasta que vuelva a caer
     # Ademas, obtengo el tiempo actual (ms) para usarlo al calcular el offset de salto
     # mediante la funcion seno, que entre [0,pi] es positiva, entonces, este tiempo
     # que se guarde aqui menos el tiempo actual van a dar numeros que comenzaran en 0
-    # e iran subiendo, para asi obtener la curva del seno como salto    
+    # e iran subiendo, para asi obtener la curva del seno como salto
     if key == KEY_SPACE and canJump and not isJumping:
-        canJump = False           
+        canJump = False
         isJumping = True
         canClimb = False
-        jumpTimer = time.time() # Parametro para el seno 
+        jumpTimer = time.time() # Parametro para el seno
     
         
     if key == KEY_ENTER:
@@ -491,12 +490,12 @@ def tickMonsters():
         if mX[i] > playerX:
             mX[i] -= mSpeedX[i]
         elif mX[i] < playerX:
-            mX[i] += mSpeedX[i]   
+            mX[i] += mSpeedX[i]
 
 
 
 # Metodo para pintar los monstruos
-def renderMonsters(window):    
+def renderMonsters(window):
     # Pintamos todos los monstruos
     for i in range(0, len(mNames)):
         drawRect(mX[i], mY[i], mWidth[i], mHeight[i], mColors[i], window)
@@ -523,7 +522,7 @@ def renderMenu(window):
     # Pintamos el mensaje principal "MENU"
     drawString(280, 90, "Menu", "white", 82, window)
     
-    # Pintamos todas las opciones del menu    
+    # Pintamos todas las opciones del menu
     for i in range(0, len(optionNames)):
         drawString(optionXCoords[i], optionYCoords[i], optionNames[i], "white", 38, window)
     
@@ -572,7 +571,7 @@ def inputMenu(key):
 # Pintar todo lo referente al juego (cuando se esta jugando)
 def renderGame(window):
     # Pintamos el mapa
-    drawMap(window) 
+    drawMap(window)
     
     # Pintamos el jugador
     renderPlayer(window)
@@ -600,15 +599,11 @@ def tick():
         tickMenu()
     elif isPlaying:
         tickGame()
-        print("isJumping ", isJumping)
-        print("isClimbing ", isClimbing)
-        print("canJump ", canJump)
-        print("canClimb ", canClimb)
     
     
     
 # Render method (Aqui se pinta el mapa de juego en base a la matriz)
-def render(window):  
+def render(window):
     if isInMenu:
         renderMenu(window)
     elif isPlaying:
@@ -617,17 +612,17 @@ def render(window):
 
 
 # Loop principal
-def gameLoop():        
+def gameLoop():
     # Creamos el objeto ventana
     mainComponent = Tk()
-    # Setteamos las dimensiones 
+    # Setteamos las dimensiones
     mainComponent.geometry(windowWidth + 'x' + windowHeight)
     # Setteamos el titulo
     mainComponent.title(windowTitle)
     # Desactivamos la opcion para cambiar el tamano
     mainComponent.resizable(0, 0)
     # Creamos un objeto canvas y le pasamos la informacion del objeto ventana
-    window = Canvas(mainComponent, bg="black", width=int(windowWidth), height=int(windowHeight)) 
+    window = Canvas(mainComponent, bg="black", width=int(windowWidth), height=int(windowHeight))
     
     
     # Setteamos el tiempo que le debe tomar actualizar 1 vez
@@ -644,12 +639,12 @@ def gameLoop():
     frameCounter = 0
     
     window.pack()
-    window.update()    
+    window.update()
     
     # Cargamos el mapa para iniciar el juego (Provisional)
     
     # Loop principal
-    while True: 
+    while True:
         # Para llevar cuenta si debe pintar o no
         shouldRender = False
         
@@ -660,13 +655,13 @@ def gameLoop():
         passedTime = startTime - lastTime
         
         # Guardamos el tiempo actual como tiempo pasado para ser usado en el proximo ciclo
-        lastTime = startTime        
+        lastTime = startTime
         
         unprocessedTime += passedTime / float(SECOND)
         frameCounter += passedTime
         #print("unpro ", unprocessedTime, " .... y frameTime ", frameTime)
         while unprocessedTime > frameTime:
-            #print("ENTROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")            
+            #print("ENTROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
             # Activamos para que pinte
             shouldRender = True
             unprocessedTime -= frameTime
@@ -680,16 +675,16 @@ def gameLoop():
                 fps = 0
                 frameCounter = 0
         
-        if shouldRender:          
+        if shouldRender:
             window.delete(ALL)
             render(window)
             window.pack()
             window.update()
             fps += 1
-        else:            
-            time.sleep(0.001)          
+        else:
+            time.sleep(0.001)
 
-    # fin del loop principal    
+    # fin del loop principal
     
 
 
@@ -704,10 +699,3 @@ map = loadMap("newlevel.png")
 
 # Iniciamos el juego
 gameLoop()
-
-
-
-    
-
-    
-    
