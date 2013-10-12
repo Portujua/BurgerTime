@@ -64,6 +64,9 @@ global window
 windowTitle = "BurgerTime"
 windowWidth = "800"
 windowHeight = "600"
+frameCap = 100.0
+SECOND = float(1)
+
 
 
 
@@ -117,8 +120,8 @@ playerWidth = 40
 
 
 # Movimiento
-speedX = 1
-speedY = 1
+speedX = 3
+speedY = 2
 jumpHeight = 20
 jumpTimer = 0
 jumpOffset = 0
@@ -356,6 +359,7 @@ def tickPlayer():
     
     # Como todo aqui tiene que ver con escalar, si isJumping entonces saltamos todo este codigo
     if isJumping:
+        print(isJumping)
         return
     
     # Revisamos si esta parado sobre una escalera para permitirle subir (Con el observador en los pies, izquierda)
@@ -441,9 +445,13 @@ def inputPlayer(key):
     elif (key == KEY_s or key == KEY_S or key == KEY_DOWN) and (canClimb):
         playerY += speedY
         isClimbing = True
+        canJump = False
     elif (key == KEY_w or key == KEY_W or key == KEY_UP) and (canClimb):
         playerY -= speedY
         isClimbing = True
+        canJump = False
+    else:
+        canJump = True
         
     # Si va a saltar, le prohibo que escale y salte nuevamente hasta que vuelva a caer
     # Ademas, obtengo el tiempo actual (ms) para usarlo al calcular el offset de salto
@@ -587,6 +595,10 @@ def tick():
         tickMenu()
     elif isPlaying:
         tickGame()
+        print("isJumping ", isJumping)
+        print("isClimbing ", isClimbing)
+        print("canJump ", canJump)
+        print("canClimb ", canClimb)
     
     
     
@@ -610,19 +622,77 @@ def gameLoop():
     # Desactivamos la opcion para cambiar el tamano
     mainComponent.resizable(0, 0)
     # Creamos un objeto canvas y le pasamos la informacion del objeto ventana
-    window = Canvas(mainComponent, bg="black", width=int(windowWidth), height=int(windowHeight))     
+    window = Canvas(mainComponent, bg="black", width=int(windowWidth), height=int(windowHeight)) 
+    
+    
+    # Setteamos el tiempo que le debe tomar actualizar 1 vez
+    frameTime = float(1.0 / frameCap)
+    
+    # Tomamos el tiempo en que se pinto por primera vez
+    lastTime = time.time()
+    
+    # Contador para saber cuantas veces todavia necesito actualizar el juego
+    unprocessedTime = 0
+    
+    # Contador de FPS
+    fps = 0
+    frameCounter = 0
+    
+    window.pack()
+    window.update()    
     
     # Cargamos el mapa para iniciar el juego (Provisional)
     
     # Loop principal
-    while True:           
-        tick()
-        render(window) 
+    while True: 
+        # Para llevar cuenta si debe pintar o no
+        shouldRender = False
+        
+        # Tomamos el tiempo en que comenzo a pintarse en este loop
+        startTime = time.time()
+        
+        # Calculamos el tiempo que le tomo pintar el ciclo pasado
+        passedTime = startTime - lastTime
+        
+        # Guardamos el tiempo actual como tiempo pasado para ser usado en el proximo ciclo
+        lastTime = startTime        
+        
+        unprocessedTime += passedTime / float(SECOND)
+        frameCounter += passedTime
+        #print("unpro ", unprocessedTime, " .... y frameTime ", frameTime)
+        while unprocessedTime > frameTime:
+            #print("ENTROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")            
+            # Activamos para que pinte
+            shouldRender = True
+            unprocessedTime -= frameTime
+            
+            # Tickeamos aqui para actualizar varias veces por segundo
+            tick()
+            
+            # Si paso un segundo, imprimimos la cantidad de FPS
+            if (frameCounter >= SECOND):
+                print(fps, " fps")
+                fps = 0
+                frameCounter = 0
+        
+        if shouldRender:
+            tiempoPasado = time.time()            
+            window.delete(ALL)
+            #print("window.delete(ALL)   ", time.time()-tiempoPasado)
+            tiempoPasado = time.time()
+            render(window)
+            #print("render(window)   ", time.time()-tiempoPasado)
+            tiempoPasado = time.time()
+            window.pack()
+            #print("window.pack()   ", time.time()-tiempoPasado)
+            tiempoPasado = time.time()
+            window.update()
+            #print("window.update()   ", time.time()-tiempoPasado)
+            tiempoPasado = time.time()
+            fps += 1
+        else:            
+            time.sleep(0.001)          
 
-        window.pack()
-        window.update()
-        window.delete(ALL)
-        #time.sleep(0.000001) # Useless
     # fin del loop principal    
     
 
