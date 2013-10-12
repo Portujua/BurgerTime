@@ -17,7 +17,10 @@ MENU_EXIT = 2
 MAX_OPTIONS = 2
 
 # Propiedades del menu
-selectedOption = 1
+# Para crear una opcion nueva es igual que los monstruos, se anade 1 item a cada arreglo de opciones 
+# se modifica arriba MAX_OPTIONS, y se anade la opcion nueva 
+
+selectedOption = 1             # Opcion seleccionada por defecto
 selectedOptionY = 230          # Altura del triangulo que funciona como cursor en el menu
 distanceBetweenOptions = 100   # Distancia entre cada opcion del menu (para mover el triangulo)
 
@@ -278,6 +281,8 @@ def getYMapValue(y):
 # Metodo para evitar que se meta por el piso al bajar
 def fixFloorBug(ex, ey, eWidth, eHeight):
     # Si en la entidad hay piso, y abajo tambien, entonces le resto el offset que baja a la pos actual
+    # Se puede ver cual es el bug desactivandola, posicionandose en una escalera y en vez de subir
+    # bajen... Van a ver que se mete por el piso 1 cuadro hacia abajo y luego vuelve a aparecer arriba
     if (getMapValue(ex+(eWidth/2), ey+eHeight+blockSize) == TILE_FLOOR) and (getMapValue(ex+(eWidth/2), ey+eHeight) == TILE_FLOOR):
         return -(ey - getYMapValue(ey)*blockSize)
     return 0
@@ -675,20 +680,11 @@ def gameLoop():
                 fps = 0
                 frameCounter = 0
         
-        if shouldRender:
-            tiempoPasado = time.time()            
+        if shouldRender:          
             window.delete(ALL)
-            #print("window.delete(ALL)   ", time.time()-tiempoPasado)
-            tiempoPasado = time.time()
             render(window)
-            #print("render(window)   ", time.time()-tiempoPasado)
-            tiempoPasado = time.time()
             window.pack()
-            #print("window.pack()   ", time.time()-tiempoPasado)
-            tiempoPasado = time.time()
             window.update()
-            #print("window.update()   ", time.time()-tiempoPasado)
-            tiempoPasado = time.time()
             fps += 1
         else:            
             time.sleep(0.001)          
