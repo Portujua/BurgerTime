@@ -47,6 +47,7 @@ KEY_S = 83
 KEY_D = 68
 KEY_W = 87
 KEY_ENTER = 13
+KEY_SPACE = 32
 
 
 
@@ -91,11 +92,13 @@ TILE_MONSTER = 4
 # Restricciones
 canClimb = False
 canWalk = True
+canJump = True
 
 
 # Estados
 isClimbing = False
 isWalking = False
+isJumping = False
 
 
 # Posicion
@@ -113,6 +116,9 @@ playerWidth = 40
 # Movimiento
 speedX = 1
 speedY = 1
+jumpHeight = 20
+jumpTimer = 0
+jumpOffset = 0
 
 
 
@@ -345,6 +351,10 @@ def drawMap(window):
 def tickPlayer():
     global canClimb, playerX, playerY, isClimbing
     
+    # Como todo aqui tiene que ver con escalar, si isJumping entonces saltamos todo este codigo
+    if isJumping:
+        return
+    
     # Revisamos si esta parado sobre una escalera para permitirle subir (Con el observador en los pies, izquierda)
     if (getMapValue(playerX+(playerWidth/2), playerY+playerHeight) == TILE_STAIRS) or (getMapValue(playerX+(playerWidth/2), playerY+(playerHeight/2)) == TILE_STAIRS):
         canClimb = True
@@ -382,19 +392,34 @@ def tickPlayer():
 
 # Metodo para pintar el jugador
 def renderPlayer(window):
+    global jumpOffset, canJump, isJumping, canClimb
+    
+    # Si estoy saltando, entonces obtengo el offset de salto y le cambio el signo
+    if isJumping:
+        jumpOffset = -math.sin(time.time() - jumpTimer) * jumpHeight
+    
+    # Si el offset de salto es positivo, quiere decir que termino el salto (grafica del seno entre 0 y pi)
+    # entonces, reseteo todos los valores para poder escalar y saltar de nuevo..   
+    if jumpOffset > 0:
+        jumpOffset = 0
+        canJump = True
+        canClimb = True
+        isJumping = False
+        
+    
     # Pintamos el jugador
-    drawRect(playerX, playerY, playerWidth, playerHeight, "white", window)     
+    drawRect(playerX, playerY + jumpOffset, playerWidth, playerHeight + jumpOffset, "white", window)     
     
     # Centro del jugador (Provisional)
-    drawRect(playerX, playerY, 5, 5, "red", window)    
+    drawRect(playerX, playerY + jumpOffset, 5, 5, "red", window)    
     
-    drawString(playerX-(playerWidth/1.7), playerY-15, windowTitle, "white", 12, window)
+    drawString(playerX-(playerWidth/1.7), playerY+ jumpOffset-15, windowTitle, "white", 12, window)
     
     
 
 # Metodo para activar el teclado en modo jugador
 def inputPlayer(key):
-    global playerX, playerY, enterPressed, isClimbing
+    global playerX, playerY, enterPressed, isClimbing, canJump, isJumping, jumpTimer, canClimb
     
     if (key == KEY_d or key == KEY_D or key == KEY_RIGHT) and not (isClimbing):
         playerX += speedX           
@@ -406,6 +431,18 @@ def inputPlayer(key):
     elif (key == KEY_w or key == KEY_W or key == KEY_UP) and (canClimb):
         playerY -= speedY
         isClimbing = True
+        
+    # Si va a saltar, le prohibo que escale y salte nuevamente hasta que vuelva a caer
+    # Ademas, obtengo el tiempo actual (ms) para usarlo al calcular el offset de salto
+    # mediante la funcion seno, que entre [0,pi] es positiva, entonces, este tiempo
+    # que se guarde aqui menos el tiempo actual van a dar numeros que comenzaran en 0
+    # e iran subiendo, para asi obtener la curva del seno como salto    
+    if key == KEY_SPACE and canJump and not isJumping:
+        canJump = False           
+        isJumping = True
+        canClimb = False
+        jumpTimer = time.time() # Parametro para el seno
+    
         
     if key == KEY_ENTER:
         enterPressed = True
@@ -567,7 +604,7 @@ def gameLoop():
         window.pack()
         window.update()
         window.delete(ALL)
-        #time.sleep(0.01) # Useless
+        #time.sleep(0.000001) # Useless
     # fin del loop principal    
     
 
