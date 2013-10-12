@@ -10,6 +10,29 @@ from tkinter import *
 from msvcrt import *
 
 # ============================== Variables ==============================
+
+# Constantes MENU
+MENU_PLAY = 1
+MENU_EXIT = 2
+MAX_OPTIONS = 2
+
+# Propiedades del menu
+selectedOption = 1
+selectedOptionY = 230          # Altura del triangulo que funciona como cursor en el menu
+distanceBetweenOptions = 100   # Distancia entre cada opcion del menu (para mover el triangulo)
+
+optionNames = ["Jugar", "Salir"]
+optionXCoords = [320, 320]
+optionYCoords = [250, 350]
+
+
+
+# Estados del juego
+isInMenu = True
+isPlaying = False
+isPaused = False
+
+
 # "Constantes" Teclado
 KEY_UP = 38
 KEY_LEFT = 37
@@ -143,29 +166,16 @@ mSpeedY = [1, 1]
 
 # Lectura de teclas presionadas
 def onKeyPressed(e):  
-    global playerX, playerY, charLastKey, enterPressed, lastTimeKeyPressed
-    global isClimbing
+    global charLastKey
     
-    lastTimeKeyPressed = time.time()  
     key = e.KeyID
     charLastKey = chr(e.Ascii)
     #print(key)
     
-    if (key == KEY_d or key == KEY_D or key == KEY_RIGHT) and not (isClimbing):
-        playerX += speedX           
-    elif (key == KEY_a or key == KEY_A or key == KEY_LEFT) and not (isClimbing):
-        playerX -= speedX
-    elif (key == KEY_s or key == KEY_S or key == KEY_DOWN) and (canClimb):
-        playerY += speedY
-        isClimbing = True
-    elif (key == KEY_w or key == KEY_W or key == KEY_UP) and (canClimb):
-        playerY -= speedY
-        isClimbing = True
-        
-    if key == KEY_ENTER:
-        enterPressed = True
-    else:
-        enterPressed = False
+    if isInMenu:
+        inputMenu(key)
+    elif isPlaying:
+        inputPlayer(key)
 
     return True # Necesario para que el programa no se cierre al presionar una tecla
 
@@ -267,8 +277,8 @@ def fixFloorBug(ex, ey, eWidth, eHeight):
 # =====================================================================================
 
 # Metodo para pintar string
-def drawString(x, y, string, color, window):
-    window.create_text(x, y, anchor=W, fill=color, font="Consolas", text=string)
+def drawString(x, y, string, color, size, window):
+    window.create_text(x, y, anchor=W, fill=color, font=("Consolas", size), text=string)
 
 
 
@@ -323,51 +333,16 @@ def drawMap(window):
         yOffset += blockSize # Sumamos blockSize al offset del eje Y para pintar abajo
         
         
-        
-        
+
 
 # =====================================================================================
 # =====================================================================================
-# ============================ Inteligencia Articial ==================================
+# ================================= Metodos Jugador ===================================
 # =====================================================================================
 # =====================================================================================
 
-# Metodo para que se muevan los monstruos
-def tickMonsters():
-    # Recorremos todos los monstruos
-    for i in range(0, len(mNames)):
-        # Movemos segun posicion actual del jugador
-        if mX[i] > playerX:
-            mX[i] -= mSpeedX[i]
-        elif mX[i] < playerX:
-            mX[i] += mSpeedX[i]   
-
-
-
-# Metodo para pintar los monstruos
-def renderMonsters(window):    
-    # Pintamos todos los monstruos
-    for i in range(0, len(mNames)):
-        drawRect(mX[i], mY[i], mWidth[i], mHeight[i], mColors[i], window)
-        drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "white", window)
-        
-        
-        
-
-# =====================================================================================
-# =====================================================================================
-# ============================== Metodos del Juego ====================================
-# =====================================================================================
-# =====================================================================================
-
-
-
-
-# Tick method (Aqui va a suceder toda la logica del juego)
-def tick():
-    tickMonsters()
-    
-    
+# Metodo para actualizar el jugador
+def tickPlayer():
     global canClimb, playerX, playerY, isClimbing
     
     # Revisamos si esta parado sobre una escalera para permitirle subir (Con el observador en los pies, izquierda)
@@ -401,26 +376,171 @@ def tick():
     # Chequeamos si la posicion previa es distinta a la posicion nueva, entonces desactivamos isClimbing
     if prevPos != playerY:
         isClimbing = False
-    
-    
-    
-# Render method (Aqui se pinta el mapa de juego en base a la matriz)
-def render(window):  
-    # Pintamos el mapa
-    drawMap(window) 
-    
+        
+        
+
+
+# Metodo para pintar el jugador
+def renderPlayer(window):
     # Pintamos el jugador
     drawRect(playerX, playerY, playerWidth, playerHeight, "white", window)     
     
     # Centro del jugador (Provisional)
     drawRect(playerX, playerY, 5, 5, "red", window)    
     
-    drawString(playerX-(playerWidth/1.7), playerY-15, windowTitle, "white", window) 
+    drawString(playerX-(playerWidth/1.7), playerY-15, windowTitle, "white", 12, window)
+    
+    
+
+# Metodo para activar el teclado en modo jugador
+def inputPlayer(key):
+    global playerX, playerY, enterPressed, isClimbing
+    
+    if (key == KEY_d or key == KEY_D or key == KEY_RIGHT) and not (isClimbing):
+        playerX += speedX           
+    elif (key == KEY_a or key == KEY_A or key == KEY_LEFT) and not (isClimbing):
+        playerX -= speedX
+    elif (key == KEY_s or key == KEY_S or key == KEY_DOWN) and (canClimb):
+        playerY += speedY
+        isClimbing = True
+    elif (key == KEY_w or key == KEY_W or key == KEY_UP) and (canClimb):
+        playerY -= speedY
+        isClimbing = True
+        
+    if key == KEY_ENTER:
+        enterPressed = True
+    else:
+        enterPressed = False
+        
+        
+
+# =====================================================================================
+# =====================================================================================
+# ============================ Inteligencia Articial ==================================
+# =====================================================================================
+# =====================================================================================
+
+# Metodo para que se muevan los monstruos
+def tickMonsters():
+    # Recorremos todos los monstruos
+    for i in range(0, len(mNames)):
+        # Movemos segun posicion actual del jugador
+        if mX[i] > playerX:
+            mX[i] -= mSpeedX[i]
+        elif mX[i] < playerX:
+            mX[i] += mSpeedX[i]   
+
+
+
+# Metodo para pintar los monstruos
+def renderMonsters(window):    
+    # Pintamos todos los monstruos
+    for i in range(0, len(mNames)):
+        drawRect(mX[i], mY[i], mWidth[i], mHeight[i], mColors[i], window)
+        drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "white", 12, window)
+        
+        
+        
+        
+
+
+# =====================================================================================
+# =====================================================================================
+# ================================= Menu del Juego ====================================
+# =====================================================================================
+# =====================================================================================
+
+
+# Metodo para actualizar el menu
+def tickMenu():
+    malditoPythonQueNoDejaInicializarFuncionesVacias = 1 # Aqui van a ir los efectos al menu
+    
+# Metodo para pintar el menu
+def renderMenu(window):
+    # Pintamos el mensaje principal "MENU"
+    drawString(280, 90, "Menu", "white", 82, window)
+    
+    # Pintamos todas las opciones del menu    
+    for i in range(0, len(optionNames)):
+        drawString(optionXCoords[i], optionYCoords[i], optionNames[i], "white", 38, window)
+    
+    #drawString(window.winfo_width() / 3 + 15, window.winfo_height() / 9, "Menu", "white", 82, window)
+    
+    
+    
+    points = [260, selectedOptionY,
+              260, selectedOptionY+40,
+              300, selectedOptionY+20]
+    window.create_polygon(points, outline="red", fill="green", width=2)
+    
+    
+    
+    
+# Metodo para activar el teclado en modo Menu
+def inputMenu(key):
+    global selectedOptionY, selectedOption, enterPressed, isInMenu, isPlaying
+    
+    # Movemos el cursor del menu segun sea la tecla
+    if (key == KEY_s or key == KEY_S or key == KEY_DOWN) and (selectedOption < MAX_OPTIONS):
+        selectedOptionY += distanceBetweenOptions
+        selectedOption += 1
+    elif (key == KEY_w or key == KEY_W or key == KEY_UP) and (selectedOption > 1):
+        selectedOptionY -= distanceBetweenOptions
+        selectedOption -= 1
+        
+    if key == KEY_ENTER:
+        if selectedOption == MENU_PLAY:
+            isInMenu = False
+            isPlaying = True
+        elif selectedOption == MENU_EXIT:
+            sys.exit()
+    
+        
+        
+        
+
+# =====================================================================================
+# =====================================================================================
+# ============================== Metodos del Juego ====================================
+# =====================================================================================
+# =====================================================================================
+
+
+# Pintar todo lo referente al juego (cuando se esta jugando)
+def renderGame(window):
+    # Pintamos el mapa
+    drawMap(window) 
+    
+    # Pintamos el jugador
+    renderPlayer(window)
     
     # Pintamos los monstruos
     renderMonsters(window)
-       
-    #drawImage("level.png", playerX, playerY, window)
+    
+    
+# Actualizar el juego (cuando se esta jugando)
+def tickGame():
+    tickMonsters()
+    tickPlayer()
+
+
+
+
+# Tick method (Aqui va a suceder toda la logica del juego)
+def tick():
+    if isInMenu:
+        tickMenu()
+    elif isPlaying:
+        tickGame()
+    
+    
+    
+# Render method (Aqui se pinta el mapa de juego en base a la matriz)
+def render(window):  
+    if isInMenu:
+        renderMenu(window)
+    elif isPlaying:
+        renderGame(window)
 
 
 
@@ -435,7 +555,7 @@ def gameLoop():
     # Desactivamos la opcion para cambiar el tamano
     mainComponent.resizable(0, 0)
     # Creamos un objeto canvas y le pasamos la informacion del objeto ventana
-    window = Canvas(mainComponent, bg="black", width=int(windowWidth), height=int(windowHeight)) 
+    window = Canvas(mainComponent, bg="black", width=int(windowWidth), height=int(windowHeight))     
     
     # Cargamos el mapa para iniciar el juego (Provisional)
     
