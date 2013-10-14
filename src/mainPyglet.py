@@ -3,6 +3,9 @@ import sys
 import math
 import time
 import pyHook
+import pyglet
+from pyglet.window import key
+from pyglet.gl import *
 
 import PIL.Image
 import PIL.ImageTk
@@ -12,28 +15,31 @@ from msvcrt import *
 # ============================== Variables ==============================
 
 # Constantes MENU
-MENU_PLAY = 1
-MENU_EXIT = 2
+MENU_PLAY = 2
+MENU_EXIT = 1
 MAX_OPTIONS = 2
 
 # Propiedades del menu
 # Para crear una opcion nueva es igual que los monstruos, se anade 1 item a cada arreglo de opciones
 # se modifica arriba MAX_OPTIONS, y se anade la opcion nueva
 
-selectedOption = 1 # Opcion seleccionada por defecto
-selectedOptionY = 230 # Altura del triangulo que funciona como cursor en el menu
-distanceBetweenOptions = 100 # Distancia entre cada opcion del menu (para mover el triangulo)
+selectedOption = 1              # Opcion seleccionada por defecto
+selectedOptionY = 240           # Coordenada Y del cursor en el menu
+selectedOptionX  = 260          # Coordenada X del cursor del menu
+selectedOptionWidth = 50        # Ancho del cursor del menu
+selectedOptionHeight = 50       # Alto del cursor del menu
+distanceBetweenOptions = 100    # Distancia entre cada opcion del menu (para mover el triangulo)
 
 optionNames = ["Jugar", "Salir"]
-optionXCoords = [320, 320]
-optionYCoords = [250, 350]
-
+optionXCoords = [400, 400]
+optionYCoords = [370, 270]
 
 
 # Estados del juego
 isInMenu = True
 isPlaying = False
 isPaused = False
+isRunning = True
 
 
 # "Constantes" Teclado
@@ -64,9 +70,10 @@ global window
 
 
 # Propiedades de la ventana
+playerName = "Chefsito"
 windowTitle = "BurgerTime"
-windowWidth = "800"
-windowHeight = "600"
+windowWidth = 800
+windowHeight = 600
 frameCap = 100.0
 SECOND = float(1)
 
@@ -98,6 +105,18 @@ TILE_MONSTER = 4
 
 
 ### ---------- Propiedades del Jugador ----------
+
+# Imagen que contiene el Grid del jugador
+playerGrid = "grid.png"
+
+# Tamano del grid
+pGridSizeX = 2
+pGridSizeY = 2
+
+# Imagenes del jugador
+pImages = []
+
+
 # Restricciones
 canClimb = False
 canWalk = True
@@ -135,6 +154,17 @@ jumpOffset = 0
 ### ---------- Propiedades los Monstruos ----------
 # Para anadir un monstruo simplemente se anade un valor extra a cada arreglo a gusto de consumidor XD
 
+# Imagen que contiene todas las imagenes de los monstruos
+monstersGridName = ["grid.png", "grid.png"]
+
+# Tamano del grid (ancho, alto)
+mGridSizeX = [2, 2]
+mGridSizeY = [2, 2]
+
+# Aqui se guardaran las imagenes leidas de cada monstruo (es usado al pintar)
+# La primera corresponde a 0,0, la segunda 1,0, la tercera 2,0... n,0 ... 0,1 , 0,2 , ..., 0,m ... n,m
+mImages = [[], []] 
+
 # Nombres
 mNames = ["CuboRojo", "CuboAzul"]
 
@@ -169,7 +199,52 @@ mSpeedY = [1, 1]
 
 
 
-# ============================== Funciones y procedimientos ==============================
+# ============================== Funciones y procedimientos ==============================    
+
+
+# Inicializar la ventana
+def initDisplay():
+    global window
+    
+    # Creamos la ventana OpenGL
+    window = pyglet.window.Window(resizable=True, vsync=False)
+    window.set_caption(windowTitle) 
+    window.set_size(windowWidth, windowHeight)  
+    
+    #pyglet.gl.glDisable(pyglet.gl.GL_DEPTH_TEST)
+    pyglet.clock.set_fps_limit(9999)
+
+    
+    
+
+# La inicializamos
+initDisplay()
+
+
+# =====================================================================================
+# =====================================================================================
+# =========================== Modificaciones OpenGL ===================================
+# =====================================================================================
+# =====================================================================================
+
+
+# Reemplazamos la funcion onKeyPress del pyglet
+@window.event
+def on_key_press(e, modifiers):    
+    
+    #inputPlayer(e)
+    #return
+    
+    # Esta funcion VVVV nos devuelve el String de la tecla que presionamos
+    #print(pyglet.window.key.symbol_string(e))
+    
+    if isInMenu:
+        inputMenu(e)
+    elif isPlaying:
+        inputPlayer(e)
+    
+    
+
 
 
 # =====================================================================================
@@ -179,38 +254,30 @@ mSpeedY = [1, 1]
 # =====================================================================================
 
 
-# Lectura de teclas presionadas
-def onKeyPressed(e):
-    global charLastKey
-    
-    key = e.KeyID
-    charLastKey = chr(e.Ascii) # Useless atm.
-    #print(key)
-    
-    if isInMenu:
-        inputMenu(key)
-    elif isPlaying:
-        inputPlayer(key)
-
-    return True # Necesario para que el programa no se cierre al presionar una tecla
-
-keyManager = pyHook.HookManager() # Creamos el objeto
-keyManager.KeyDown = onKeyPressed # que maneja las
-keyManager.HookKeyboard() # teclas presionadas
-
-
-
 # Metodo para cargar una imagen
 def openImage(filePath):
     # Cargamos la imagen
-    image = PIL.Image.open(filePath)
-    image.load()
-    
-    # Es necesaria cierta transformacion, pero no se que hace esto...
-    image = PIL.ImageTk.PhotoImage(image)
-    
-    # Retornamos la imagen
+    image = pyglet.image.load(filePath)  
     return image
+
+
+# Metodo leer un grid de imagenes y devolverlo como array de imagenes
+def loadGridImage(filePath, x, y):
+    grid = openImage(filePath)
+    imageGrid = pyglet.image.ImageGrid(grid, x, y)
+    return imageGrid
+
+
+# Metodo para cargar imagenes de menu
+def loadMenuTexture(fileName, x, y):
+    filePath = "../res/textures/menu/" + fileName
+    return loadGridImage(filePath, x, y)
+
+
+# Metodo para cargar imagenes de juego
+def loadGameTexture(fileName, x, y):
+    filePath = "../res/textures/game/" + fileName
+    return loadGridImage(filePath, x, y)
 
 
 
@@ -261,7 +328,6 @@ def loadMap(filePath):
     return mapReaded
 
 
-
 # Metodo para obtener el valor del mapa en la posicion x,y
 def getMapValue(x, y):
     return map[getXMapValue(x) + getYMapValue(y) * mapWidth]
@@ -293,50 +359,82 @@ def fixFloorBug(ex, ey, eWidth, eHeight):
 # =====================================================================================
 # =====================================================================================
 
-# Metodo para pintar string
-def drawString(x, y, string, color, size, window):
-    window.create_text(x, y, anchor=W, fill=color, font=("Consolas", size), text=string)
-
-
-
-# Metodo para pintar una figura
-def drawRect(x, y, xSize, ySize, color, window):
-    window.create_rectangle(x, y, x + xSize, y + ySize, fill=color)
-
-
-
-# Metodo para pintar imagenes
-def drawImage(filePath, x, y, window): # ARREGLAR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    sprite = openImage("../res/" + filePath)
-    window.create_image(x, y, anchor=NW, image=sprite)
+# Pintar lineas (Por tenerlo..)
+def drawLines(px, py, qx, qy, rgb):
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    # Convertimos de RGB a R,G,B
+    r = (rgb << 16) & 0xFFFFFF
+    b = (rgb << 8) & 0xFFFFFF
+    g = rgb & 0xFFFFFF
+    
+    # Setteamos el color
+    pyglet.gl.glColor3f(r, g, b)
+    # Pintamos basandonos en los puntos P,Q
+    pyglet.graphics.draw(2, pyglet.gl.GL_LINES, ('v2f', (px, py, qx, qy)))
     
 
-# Metodo para pintar el fondo negro
-def drawBackground(color, window):
-    drawRect(0, 0, int(windowWidth), int(windowHeight), color, window)
+# Metodo para pintar string, el string sera pintado centrado en el punto x,y dado.. Ejemplo:
+# Si se da como punto window.width/2, window.height/2 entonces saldra centrado en la pantalla
+def drawString(xx, yy, string, font, color, size):
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    t = pyglet.text.Label(string, font_name=font, font_size=size, x=xx, y=yy,
+                          anchor_x='center', anchor_y='center')
+    t.draw()
+
+
+# Metodo para pintar imagenes (Innecesario pero se hace mas facil de entender
+def drawImage(image, x, y):
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    image.blit(x, y)
+    
+
+# Parecibo a pintar una imagen, pero en este podemos especificar el tamano que queremos que sea pintada
+# Le pasamos una imagen y aqui la convertiremos a textura para posteriormente redimensionarla
+def drawTexture(image, x, y, width, height):
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    # Obtenemos la textura de la imagen
+    texture = image.get_texture()
+    
+    # Setteamos el modo de conversion del OpenGL
+    pyglet.gl.glTexParameteri(pyglet.gl.GL_TEXTURE_2D, pyglet.gl.GL_TEXTURE_MAG_FILTER, pyglet.gl.GL_NEAREST)
+    
+    # Setteamos el nuevo tamano
+    texture.width = width
+    texture.height = height
+    
+    # La pintamos
+    texture.blit(x, y)
+    
     
     
 
 # Metodo que pinta el mapa basandose en la matriz del mapa y el tamano de cada bloque
-def drawMap(window):
+# Aqui hay un problema, le toma 0.5 seg renderizar esto
+def drawMap():
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
     # Creamos dos variables para ir llevando el offset
     # Cada bloque se pintara en una coordenada X mas el OFFSET total
     xOffset = 0
     yOffset = 0
     
-    # Pintamos el fondo de primero
-    #drawBackground("black", window)
-    
-    #drawRect(blockSize, blockSize, blockSize+blockSize/2, blockSize+blockSize/2, "yellow", window)
-    
-    #return
+    # Creamos una variable para la textura
+    mapTexture = loadGridImage("../res/textures/map/grid.png", 2, 2)
     
     # Recorremos todo el mapa
     for y in range(0, mapHeight):
         for x in range(0, mapWidth):
-            # Evitamos pintar los pixeles azules
-            if y*blockSize > int(windowHeight):
-                continue
+            # Chequeamos para no pintar cosas innecesarias
+            if (xOffset > window.width) or (yOffset > window.height): continue
             
             # Wtf
             if (x + y*mapWidth) < 0 or (x + y*mapWidth) >= len(map):
@@ -345,31 +443,30 @@ def drawMap(window):
             # Obtenemos la coordenada actual
             actCoord = map[x + y*mapWidth]
             
-            # Para evitar pintar cosas innecesarias
-            if actCoord == TILE_NULL or actCoord == TILE_NONE:
-                # Aumentamos el offset aunque no pintemos
-                # Sino se distorsiona todo el mapa
+            if actCoord == TILE_NONE or actCoord == TILE_NULL:
                 xOffset += blockSize
                 continue
             
-            # Creamos una variable para el color actual
-            actColor = "black" # Por defecto negro
+            # Variable para la textura actual
+            actTexture = None
             
             # Setteamos el color segun el numero en la matriz
             if actCoord == TILE_FLOOR:
-                actColor = "blue"
+                actTexture = mapTexture[2]
             elif actCoord == TILE_STAIRS:
-                actColor = "brown"
+                actTexture = mapTexture[3]
+            else:
+                actTexture = mapTexture[1]
             
             # Pintamos el bloque
-            drawRect(xOffset, yOffset, blockSize, blockSize, actColor, window)
+            drawTexture(actTexture, xOffset, yOffset, blockSize, blockSize)
             
             # Actualizamos los offset
             xOffset += blockSize # Podriamos tener 1 solo offset ya que son iguales
             
         xOffset = 0 # Reiniciamos el offset del eje X para comenzar a pintar desde 0
         yOffset += blockSize # Sumamos blockSize al offset del eje Y para pintar abajo
-        
+
         
 
 
@@ -423,7 +520,10 @@ def tickPlayer():
 
 
 # Metodo para pintar el jugador
-def renderPlayer(window):
+def renderPlayer():
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
     global jumpOffset, canJump, isJumping, canClimb
     
     # Si estoy saltando, entonces obtengo el offset de salto y le cambio el signo
@@ -440,21 +540,22 @@ def renderPlayer(window):
         
     
     # Pintamos el jugador
-    drawRect(playerX, playerY + jumpOffset, playerWidth, playerHeight + jumpOffset, "white", window)
+    drawTexture(pImages[0], playerX, playerY + jumpOffset, playerWidth, playerHeight + jumpOffset)
+    #drawRect(playerX, playerY + jumpOffset, playerWidth, playerHeight + jumpOffset, "white", window)
     
     # Centro del jugador (Provisional)
-    drawRect(playerX, playerY + jumpOffset, 5, 5, "red", window)
-    
-    drawString(playerX-(playerWidth/1.7), playerY+ jumpOffset-15, windowTitle, "white", 12, window)
+    #drawRect(playerX, playerY + jumpOffset, 5, 5, "red", window)
+
+    drawString(playerX-(playerWidth/2), playerY + jumpOffset-15, playerName, "Consolas", "white", 12)
     
     
 
 # Metodo para activar el teclado en modo jugador
-def inputPlayer(key):
+def inputPlayer(e):
     global playerX, playerY, enterPressed, isClimbing, canJump, isJumping, jumpTimer, canClimb, isPaused
-    
+
     # Primero chequeamos si se pauso el juego, para asi saltar todo este codigo
-    if key == KEY_p or key == KEY_P:
+    if e == key.P:
         # Invertimos el valor de isPaused
         isPaused = not(isPaused)
         
@@ -463,34 +564,40 @@ def inputPlayer(key):
             return
     
     
-    if (key == KEY_d or key == KEY_D or key == KEY_RIGHT) and not (isClimbing):
+    if (e == key.D or e == key.RIGHT) and not (isClimbing):
         playerX += speedX
-    elif (key == KEY_a or key == KEY_A or key == KEY_LEFT) and not (isClimbing):
+    elif (e == key.A or e == key.LEFT) and not (isClimbing):
         playerX -= speedX
-    elif (key == KEY_s or key == KEY_S or key == KEY_DOWN) and (canClimb):
+    elif (e == key.S or e == key.DOWN) and (canClimb):
         playerY += speedY
         isClimbing = True
         canJump = False
-    elif (key == KEY_w or key == KEY_W or key == KEY_UP) and (canClimb):
+    elif (e == key.W or e == key.UP) and (canClimb):
         playerY -= speedY
         isClimbing = True
         canJump = False
     elif not isClimbing:
         canJump = True
         
+    # Chequeo si no me sali de la ventana
+    if playerX+playerWidth > window.width:
+        playerX = window.width-playerWidth
+    elif playerX < 0:
+        playerX = 0
+        
     # Si va a saltar, le prohibo que escale y salte nuevamente hasta que vuelva a caer
     # Ademas, obtengo el tiempo actual (ms) para usarlo al calcular el offset de salto
     # mediante la funcion seno, que entre [0,pi] es positiva, entonces, este tiempo
     # que se guarde aqui menos el tiempo actual van a dar numeros que comenzaran en 0
     # e iran subiendo, para asi obtener la curva del seno como salto
-    if key == KEY_SPACE and canJump and not isJumping:
+    if e == key.SPACE and canJump and not isJumping:
         canJump = False
         isJumping = True
         canClimb = False
         jumpTimer = time.time() # Parametro para el seno
     
         
-    if key == KEY_ENTER:
+    if e == key.ENTER:
         enterPressed = True
     else:
         enterPressed = False
@@ -516,11 +623,14 @@ def tickMonsters():
 
 
 # Metodo para pintar los monstruos
-def renderMonsters(window):
+def renderMonsters():
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
     # Pintamos todos los monstruos
     for i in range(0, len(mNames)):
-        drawRect(mX[i], mY[i], mWidth[i], mHeight[i], mColors[i], window)
-        drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "white", 12, window)
+        drawTexture(mImages[i][0], mX[i], mY[i], mWidth[i], mHeight[i])
+        drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "Consolas", "white", 12)
         
         
         
@@ -539,39 +649,38 @@ def tickMenu():
     malditoPythonQueNoDejaInicializarFuncionesVacias = 1 # Aqui van a ir los efectos al menu
     
 # Metodo para pintar el menu
-def renderMenu(window):
+def renderMenu():
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
     # Pintamos el mensaje principal "MENU"
-    drawString(280, 90, "Menu", "white", 82, window)
+    drawString(window.width/2, window.height-70, "Menu", "Consolas", "white", 82)
     
     # Pintamos todas las opciones del menu
     for i in range(0, len(optionNames)):
-        drawString(optionXCoords[i], optionYCoords[i], optionNames[i], "white", 38, window)
+        drawString(optionXCoords[i], optionYCoords[i], optionNames[i], "Consolas", "white", 38)     
     
-    #drawString(window.winfo_width() / 3 + 15, window.winfo_height() / 9, "Menu", "white", 82, window)
-    
-    
-    
-    points = [260, selectedOptionY,
-              260, selectedOptionY+40,
-              300, selectedOptionY+20]
-    window.create_polygon(points, outline="red", fill="green", width=2)
-    
+    #menuArrow = openImage("../res/textures/menu/gameArrow.jpg")
+    #menuArrow = loadMenuTexture("gameArrow.jpg", 1, 1)
+    #drawTexture(menuArrow[0], selectedOptionX, selectedOptionY, selectedOptionWidth, selectedOptionHeight)    
     
     
     
 # Metodo para activar el teclado en modo Menu
-def inputMenu(key):
+def inputMenu(e):
     global selectedOptionY, selectedOption, enterPressed, isInMenu, isPlaying
     
     # Movemos el cursor del menu segun sea la tecla
-    if (key == KEY_s or key == KEY_S or key == KEY_DOWN) and (selectedOption < MAX_OPTIONS):
-        selectedOptionY += distanceBetweenOptions
-        selectedOption += 1
-    elif (key == KEY_w or key == KEY_W or key == KEY_UP) and (selectedOption > 1):
+    if (e == key.S or e == key.DOWN) and (selectedOption > 1):
         selectedOptionY -= distanceBetweenOptions
         selectedOption -= 1
+        print("Restando a opcion ", selectedOption)
+    elif (e == key.W or e == key.UP) and (selectedOption < MAX_OPTIONS):
+        selectedOptionY += distanceBetweenOptions
+        selectedOption += 1
+        print("Sumando a opcion ", selectedOption)
         
-    if key == KEY_ENTER:
+    if e == key.ENTER:
         if selectedOption == MENU_PLAY:
             isInMenu = False
             isPlaying = True
@@ -589,20 +698,46 @@ def inputMenu(key):
 # =====================================================================================
 
 
+# Inicializamos los objetos del juego
+def initGameObjects():
+    # ===== Creamos los monstruos ===== 
+    # Para cada monstruo, hacemos:
+    for m in range(0, len(mNames)):         
+        # Cargamos el grid
+        tempTexture = loadGameTexture(monstersGridName[m], mGridSizeX[m], mGridSizeY[m])
+              
+        # Pegamos todas las texturas en el arreglo de textura de ese monstruo
+        for i in range(0, len(tempTexture)):            
+            mImages[m].append(tempTexture[i])
+        
+    
+    # ===== Creamos el jugador =====
+    # Cargamos el grid
+    tempTexture = loadGameTexture(playerGrid, pGridSizeX, pGridSizeY)
+    
+    # Pegamos todas las texturas en el arreglo de texturas del jugador
+    for i in range(0, len(tempTexture)):
+        pImages.append(tempTexture[i])
+
+
+
 # Pintar todo lo referente al juego (cuando se esta jugando)
-def renderGame(window):
+def renderGame():
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
     # Pintamos el mapa
-    drawMap(window)
+    drawMap()
     
     # Pintamos el jugador
-    renderPlayer(window)
+    renderPlayer()
     
     # Pintamos los monstruos
-    renderMonsters(window)
+    renderMonsters()
     
     # Si esta pausado el juego, pintamos un Texto que nos lo diga
     if isPaused:
-        drawString(250, 200, "PAUSE", "white", 80, window)
+        drawString(window.width/2, window.height/2, "PAUSA", "Consolas", "white", 100)
     
     
 # Actualizar el juego (cuando se esta jugando)
@@ -616,6 +751,11 @@ def tickGame():
 
 # Tick method (Aqui va a suceder toda la logica del juego)
 def tick():
+    #print("Tickea")
+    #tickPlayer()
+    #tickMonsters()
+    #return
+    
     if isInMenu:
         tickMenu()
     elif isPlaying:
@@ -624,88 +764,56 @@ def tick():
     
     
 # Render method (Aqui se pinta el mapa de juego en base a la matriz)
-def render(window):
+def render():    
+    #drawMap()
+    #renderPlayer()
+    #renderMonsters()
+    
+    #drawMap()
+    #print(time.time())
+    #return
+    
+    glClear(GL_COLOR_BUFFER_BIT)
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    window.clear()
+    
     if isInMenu:
-        renderMenu(window)
+        renderMenu()
     elif isPlaying:
-        renderGame(window)
+        renderGame()
+        
+    fps = int(pyglet.clock.get_fps()) 
+    drawString(80, window.height-30, str(fps) + " fps", "Consolas", "white", 24)
 
 
+# Metodo para actualizar todo, el parametro es necesario por el pyglet
+def update(dt): 
+       
+    # Tickeamos aqui, antes de pintar
+    tick()
+    
+    # Limpiamos la pantalla actual
+    #window.clear()
+    #pyglet.gl.glClear(pyglet.gl.GL_COLOR_BUFFER_BIT | pyglet.gl.GL_DEPTH_BUFFER_BIT)
+    
+    # Pintamos
+    #render()
+    
+    #fps = int(pyglet.clock.get_fps())    
+    #drawString(80, window.height-30, str(fps) + " fps", "Consolas", "white", 24)
 
-# Loop principal
-def gameLoop():
-    # Creamos el objeto ventana
-    mainComponent = Tk()
-    # Setteamos las dimensiones
-    mainComponent.geometry(windowWidth + 'x' + windowHeight)
-    # Setteamos el titulo
-    mainComponent.title(windowTitle)
-    # Desactivamos la opcion para cambiar el tamano
-    mainComponent.resizable(0, 0)
-    # Creamos un objeto canvas y le pasamos la informacion del objeto ventana
-    window = Canvas(mainComponent, bg="black", width=int(windowWidth), height=int(windowHeight))
-    
-    
-    # Setteamos el tiempo que le debe tomar actualizar 1 vez
-    frameTime = float(1.0 / frameCap)
-    
-    # Tomamos el tiempo en que se pinto por primera vez
-    lastTime = time.time()
-    
-    # Contador para saber cuantas veces todavia necesito actualizar el juego
-    unprocessedTime = 0
-    
-    # Contador de FPS
-    fps = 0
-    frameCounter = 0
-    
-    window.pack()
-    window.update()
-    
-    # Cargamos el mapa para iniciar el juego (Provisional)
-    
-    # Loop principal
-    while True:
-        # Para llevar cuenta si debe pintar o no
-        shouldRender = False
-        
-        # Tomamos el tiempo en que comenzo a pintarse en este loop
-        startTime = time.time()
-        
-        # Calculamos el tiempo que le tomo pintar el ciclo pasado
-        passedTime = startTime - lastTime
-        
-        # Guardamos el tiempo actual como tiempo pasado para ser usado en el proximo ciclo
-        lastTime = startTime
-        
-        unprocessedTime += passedTime / float(SECOND)
-        frameCounter += passedTime
-        #print("unpro ", unprocessedTime, " .... y frameTime ", frameTime)
-        while unprocessedTime > frameTime:
-            #print("ENTROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-            # Activamos para que pinte
-            shouldRender = True
-            unprocessedTime -= frameTime
-            
-            # Tickeamos aqui para actualizar varias veces por segundo
-            tick()
-            
-            # Si paso un segundo, imprimimos la cantidad de FPS
-            if (frameCounter >= SECOND):
-                print(fps, " fps")
-                fps = 0
-                frameCounter = 0
-        
-        if shouldRender:
-            window.delete(ALL)
-            render(window)
-            window.pack()
-            window.update()
-            fps += 1
-        else:
-            time.sleep(0.001)
 
-    # fin del loop principal
+@window.event
+def on_draw():
+    glClear(GL_COLOR_BUFFER_BIT)
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    window.clear()
+    render()  
+    fps = int(pyglet.clock.get_fps()) 
+    drawString(80, window.height-30, str(fps) + " fps", "Consolas", "white", 24)
+    
     
 
 
@@ -716,7 +824,31 @@ def gameLoop():
 # =====================================================================================
 
 # Leemos el mapa del archivo
-map = loadMap("newlevel.png")
+map = loadMap("newlevel.png")    
+
+initGameObjects()
 
 # Iniciamos el juego
-gameLoop()
+if __name__ == '__main__':
+    # Iniciamos nuestro update
+    pyglet.clock.schedule_interval(update, 1/500000.0)
+    # Corremos la aplicacion
+    pyglet.app.run()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
