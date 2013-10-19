@@ -2,17 +2,10 @@
 import sys
 import math
 import time
-import pyHook
-import pyglet
-from pyglet.window import key
-from pyglet.gl import *
 import pygame
 from pygame.locals import *
 
 import PIL.Image
-import PIL.ImageTk
-from tkinter import *
-from msvcrt import *
 
 # ============================== Variables ==============================
 
@@ -166,10 +159,10 @@ speedY = 2
 movementVector = [0,0] # [x,y] --> x {-1,0,1} ... y {-1,0,1}
 
 # Salto
-jumpHeight = 20
+jumpHeight = 40
 jumpTimer = 0
 jumpOffset = 0
-jumpSpeed = 2.5
+jumpSpeed = 3.5
 
 
 
@@ -645,14 +638,14 @@ def inputPlayer(e):
     # mediante la funcion seno, que entre [0,pi] es positiva, entonces, este tiempo
     # que se guarde aqui menos el tiempo actual van a dar numeros que comenzaran en 0
     # e iran subiendo, para asi obtener la curva del seno como salto
-    if e == key.SPACE and canJump and not isJumping:
+    if e == KEY_SPACE and canJump and not isJumping:
         canJump = False
         isJumping = True
         canClimb = False
         jumpTimer = time.time() # Parametro para el seno
     
         
-    if e == key.ENTER:
+    if e == KEY_ENTER:
         enterPressed = True
     else:
         enterPressed = False
@@ -773,10 +766,7 @@ def inputMenu(e):
 
 
 # Pintar todo lo referente al juego (cuando se esta jugando)
-def renderGame():
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    
+def renderGame():    
     # Pintamos el mapa
     drawMap()
     
