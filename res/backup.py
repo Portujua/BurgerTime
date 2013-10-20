@@ -26,8 +26,8 @@ selectedOptionHeight = 50       # Alto del cursor del menu
 distanceBetweenOptions = 100    # Distancia entre cada opcion del menu (para mover el triangulo)
 
 optionNames = ["Salir", "Jugar"]
-optionXCoords = [17, 17]
-optionYCoords = [15.5, 10.5]
+optionXCoords = [340, 340]
+optionYCoords = [310, 210]
 
 
 # Estados del juego
@@ -105,9 +105,6 @@ TILE_BOTTOMSTAIRS = 5
 
 ### ---------- Propiedades del Jugador ----------
 
-# Valores iniciales
-pPos = [3, 23]
-
 # Constantes de las imagenes
 PIMAGE_STAND = 0
 PIMAGE_WRIGHT = 1
@@ -150,25 +147,24 @@ isJumping = False
 
 
 # Posicion
-#playerX = 520 # Posicion inicial X
-#playerY = 420 # Posuicion inicial Y
-playerPosition = [3, 23]
+playerX = 520 # Posicion inicial X
+playerY = 420 # Posuicion inicial Y
 
 
 
 # Tamano
-playerHeight = 1
-playerWidth = 1
+playerHeight = 60
+playerWidth = 40
 
 
 
 # Movimiento
-speedX = 0.11
-speedY = 0.08
+speedX = 3
+speedY = 2
 movementVector = [0,0] # [x,y] --> x {-1,0,1} ... y {-1,0,1}
 
 # Salto
-jumpHeight = 2
+jumpHeight = 40
 jumpTimer = 0
 jumpOffset = 0
 jumpSpeed = 3.5
@@ -178,10 +174,6 @@ jumpSpeed = 3.5
 
 ### ---------- Propiedades los Monstruos ----------
 # Para anadir un monstruo simplemente se anade un valor extra a cada arreglo a gusto de consumidor XD
-
-# Valores iniciales
-mPosX = [24, 35.5]
-mPosY = [7, 20]
 
 # Imagen que contiene todas las imagenes de los monstruos
 monstersGridName = ["grid.png", "grid.png"]
@@ -195,7 +187,7 @@ mGridSizeY = [2, 2]
 mImages = [[], []] 
 
 # Nombres
-mNames = ["ene1"] # "CuboRojo", "CuboAzul"
+mNames = ["Enemigo"] # "CuboRojo", "CuboAzul"
 
 # Colores (Provisional)
 mColors = ["red", "blue"]
@@ -211,20 +203,20 @@ mIsWalking = [False, False]
 
 
 # Posicion
-mX = [6, 35.5] # Posicion inicial X
-mY = [21, 20] # Posuicion inicial Y
+mX = [120, 710] # Posicion inicial X
+mY = [420, 400] # Posuicion inicial Y
 
 
 
 # Tamano
-mHeight = [1, 1]
-mWidth = [1, 1]
+mHeight = [60, 60]
+mWidth = [40, 40]
 
 
 
 # Movimiento
-mSpeedX = [0.1, 0.05]
-mSpeedY = [0.01, 0.01]
+mSpeedX = [1, 2.5]
+mSpeedY = [1, 1]
 
 
 
@@ -254,11 +246,12 @@ def loadGameObjects():
 
 # Metodo para resetear monstruos al morir
 def resetThings():
-    global mX, mY, playerPosition
-    mX = [20, 35.5] # Posicion inicial X
-    mY = [21, 20] # Posuicion inicial Y
+    global mX, mY, playerX, playerY
+    mX = [520, 710] # Posicion inicial X
+    mY = [400, 400] # Posuicion inicial Y
     
-    playerPosition = [3, 23]
+    playerX = 120 # Posicion inicial X
+    playerY = 400 # Posuicion inicial Y
 
     
 # Metodo para "soltar" las teclas del teclado
@@ -341,6 +334,8 @@ def loadMap(filePath):
                 mapReaded.append(TILE_FLOOR)
             elif (rgb ^ 0xFFFFFF) == 0xFF00FF: # Verde (Escaleras)
                 mapReaded.append(TILE_STAIRS)
+            elif rgb == 0x00FE00:
+                mapReaded.append(TILE_BOTTOMSTAIRS)
             else:
                 mapReaded.append(TILE_NULL)
             # Faltan los otros colores....
@@ -351,12 +346,27 @@ def loadMap(filePath):
 
 # Metodo para obtener el valor del mapa en la posicion x,y
 def getMapValue(x, y):
-    x = math.floor(x)
-    y = math.floor(y)
     # Chequeamos que no nos salgamos de la matriz
-    if x + y * mapWidth >= 0 and x < mapWidth:
+    if getXMapValue(x) + getYMapValue(y) * mapWidth >= 0 and getXMapValue(x) < mapWidth:
+        return map[getXMapValue(x) + getYMapValue(y) * mapWidth]
+    return 0
+
+# Metodo para obtener el valor del mapa dadas las coordenadas del mapa
+def getMapValueAt(x, y):
+    if x >= 0 and x < mapWidth and y >= 0 and y < mapHeight:
         return map[x + y * mapWidth]
     return 0
+
+
+# Metodo para obtener la X dentro del mapa
+def getXMapValue(x):
+    return int(math.fabs(x/blockSize))
+
+
+# Metodo para obtener la Y dentro del mapa
+def getYMapValue(y):
+    return int(math.fabs(y/blockSize))
+
 
 
 # Metodo para evitar que se meta por el piso al bajar
@@ -365,19 +375,16 @@ def fixStairsBug(ex, ey, eWidth, eHeight):
     # Se puede ver cual es el bug desactivandola, posicionandose en una escalera y en vez de subir
     # bajen... Van a ver que se mete por el piso 1 cuadro hacia abajo y luego vuelve a aparecer arriba
     if (getMapValue(ex+(eWidth/2), ey+eHeight+blockSize) == TILE_FLOOR) and (getMapValue(ex+(eWidth/2), ey+eHeight) == TILE_FLOOR):
-        return -(ey - ey*blockSize)
+        return -(ey - getYMapValue(ey)*blockSize)
     return 0
 
 # Metodo para saber si podemos movernos a un recuadro x,y
-def canMoveTo(x, y, movementVector, sx, sy): # sx = speedX
+def canMoveTo(x, y, movementVector):
     # Obtenemos las coordenadas del vector movimiento
     vx = movementVector[0]
     vy = movementVector[1]
     
-    #print("Estoy en ", x, ",", y)
-    #print("Voy para ", vx, ",", vy)
-    
-    if getMapValue(math.floor(x + sx + vx), math.floor(y + sy + vy)) == TILE_FLOOR or getMapValue(math.floor(x + sx + vx), math.floor(y + sy + vy)) == TILE_STAIRS:
+    if getMapValue(x + vx, (y + vy)) == TILE_FLOOR or getMapValue(x + vx, (y + vy)) == TILE_STAIRS:
         #print("Si me puedo mvoverr")
         return True
     elif isClimbing:
@@ -396,17 +403,17 @@ def getChilds(x, y, visited):
     allChilds = []
     
     # Obtenemos todos los valores de las direcciones (para no escribir tanto en los if)
-    up = getMapValue(x, y-1)
-    down = getMapValue(x, y+1)
-    left = getMapValue(x-1, y)
-    right = getMapValue(x+1, y)
+    up = getMapValueAt(x, y-1)
+    down = getMapValueAt(x, y+1)
+    left = getMapValueAt(x-1, y)
+    right = getMapValueAt(x+1, y)
     
     # Si arriba hay piso/escalera y no he visitado ese nodo, es un hijo valido
     if (up == TILE_STAIRS or up == TILE_BOTTOMSTAIRS) and not((x, y-1) in visited):
         allChilds.append((x, y-1))
         
     # Si abajo hay piso/escalera y no he visitado ese nodo, es un hijo valido
-    if (down == TILE_STAIRS or down == TILE_FLOOR) and not((x, y+1) in visited):
+    if (down == TILE_STAIRS or down == TILE_BOTTOMSTAIRS) and not((x, y+1) in visited):
         allChilds.append((x, y+1))
         
     # Si a la izquierda hay piso/escalera y no he visitado ese nodo, es un hijo valido
@@ -425,7 +432,7 @@ def getChilds(x, y, visited):
 # a,b son vectores (x,y), path es la matriz de matrices de todos los caminos posibles (la que vamos a devolver)
 # visited son los nodos que ya visitamos, al llamar la funcion por primera vez se envia Vacio
 # Le enviamos dos puntos A,B en coordenadas del mapa
-def getPathTo(a, b, path, visited, allPaths, iteration):     
+def getPathTo(a, b, path, visited, iteration):     
     # Marcamos como visitado el nodo actual
     visited.append(a)
     # Obtenemos las componentes de A
@@ -433,7 +440,7 @@ def getPathTo(a, b, path, visited, allPaths, iteration):
 
     # Buscamos los hijos
     aChilds = getChilds(ax, ay, visited)
-
+    
     # Si A no tiene hijos, llegamos a una calle ciega
     if len(aChilds) == 0: 
         return False
@@ -448,7 +455,7 @@ def getPathTo(a, b, path, visited, allPaths, iteration):
             return True
         # Sino llamamos recursivamente a la funcion con el nuevo hijo para que busque hijos en el
         else:
-            arrived = getPathTo(child, b, path, visited, allPaths, iteration+1)
+            arrived = getPathTo(child, b, path, visited, iteration+1)
             # Chequeamos si llegamos por alguno de los hijos
             # Si no llegamos, sacamos al nodo actual del camino
             if not arrived:
@@ -458,29 +465,17 @@ def getPathTo(a, b, path, visited, allPaths, iteration):
                 # Chequeamos, si iteration = 0 es que estamos en el primer loop
                 # Y debemos devolver el camino en vez de True
                 if iteration == 0:
-                    #print("Camino: ", path)
-                    #return path
-                    allPaths.append(path)
-                    path = []
+                    print("Camino: ", path)
+                    print("")
+                    return path
                 else:
                     return True
     # Si terminamos de recorrer todos los hijos y no llegamos, devolvemos FALSE
     # Chequeamos si estamos en el loop principal, si es asi entonces devolvemos el mismo punto donde estabamos
     if iteration == 0:
-        # Creamos una variable para guardar el camino mas corto
-        shortestPath = allPaths[0]
-        shortestLength = len(shortestPath)
-        
-        # Vemos cual de todos es el mas corto
-        for p in allPaths:
-            if len(p) < shortestLength:
-                shortestPath = p
-                shortestLength = len(p)
-            #print("Un camino de ", len(p), " es: ", p)
-        
-        #print("")
-        #print("El mas corto fue de ", shortestLength, " y es: ", shortestPath)
-        return shortestPath
+        path = []
+        path.append(a)
+        return path
     else: # Sino, devolvemos falso para notificar que termino el loop y no encontro camino con ese hijo
         return False
     
@@ -492,19 +487,23 @@ def getPathTo(a, b, path, visited, allPaths, iteration):
 def getMovementVector(p, ex, ey):
     # Obtenemos las coordenadas del punto p
     px, py = p[0]
-
+    
+    # Convertimos las coordenadas a coordenadas de mapa
+    eMapX = getXMapValue(ex)
+    eMapY = getYMapValue(ey)
+    
     # Creamos el vector movimiento (sin movimiento, por ahora)
     mVector = [0,0]
     
-    if ey < py:
-        mVector[1] = 1
-    elif ey > py:
-        mVector[1] = -1
-    elif ex < px:
+    if eMapX < px:
         mVector[0] = 1
-    elif ex > px:
+    elif eMapX > px:
         mVector[0] = -1
-    
+    elif eMapY < py:
+        mVector[1] = -1
+    elif eMapY > py:
+        mVector[1] = 1
+        
     return mVector
     
     
@@ -517,13 +516,13 @@ def getMovementVector(p, ex, ey):
 
 # Pintar rectangulos (por tenerlo.)
 def drawRect(x, y, width, height, rgbColor):
-    pygame.draw.rect(window, rgbColor, (x*blockSize, y*blockSize, width*blockSize, height*blockSize))
+    pygame.draw.rect(window, rgbColor, (x, y, width, height))
     
     
 
 # Pintar lineas (Por tenerlo..)
 def drawLines(px, py, qx, qy, rgbColor, weight):
-    pygame.draw.line(window, rgbColor, (px*blockSize, py*blockSize), (qx*blockSize, qy*blockSize), weight)
+    pygame.draw.line(window, rgbColor, (px, py), (qx, qy), weight)
     
 
 # Metodo para pintar string, el string sera pintado centrado en el punto x,y dado.. Ejemplo:
@@ -531,16 +530,16 @@ def drawLines(px, py, qx, qy, rgbColor, weight):
 def drawString(x, y, string, font, rgbColor, size):
     str = pygame.font.SysFont(font, size)
     lbl = str.render(string, 1, rgbColor)
-    window.blit(lbl, (x*blockSize, y*blockSize))
+    window.blit(lbl, (x, y))
 
 
 # Metodo para pintar imagenes sin redimensionar
 def drawImage(image, x, y):
-    window.blit(image, (x*blockSize,y*blockSize))
+    window.blit(image, (x,y))
     
 # Metodo para pintar imagenes redimensionadas
 def drawImageR(image, x, y, width, height): 
-    window.blit(pygame.transform.scale(image, (width*blockSize, height*blockSize)), (x*blockSize, y*blockSize))
+    window.blit(pygame.transform.scale(image, (width, height)), (x, y))
     
     
 # Metodo para pintar poligonos
@@ -570,7 +569,7 @@ def drawMap():
             actCoord = map[x + y*mapWidth]
             
             if actCoord == TILE_NONE or actCoord == TILE_NULL:
-                xOffset += 1
+                xOffset += blockSize
                 continue
             
             # Variable para la textura actual
@@ -585,13 +584,13 @@ def drawMap():
                 actColor = "black"
             
             # Pintamos el bloque
-            drawRect(xOffset, yOffset, 1, 1, getColor(actColor))
+            drawRect(xOffset, yOffset, blockSize, blockSize, getColor(actColor))
             
             # Actualizamos los offset
-            xOffset += 1 # Podriamos tener 1 solo offset ya que son iguales
+            xOffset += blockSize # Podriamos tener 1 solo offset ya que son iguales
             
         xOffset = 0 # Reiniciamos el offset del eje X para comenzar a pintar desde 0
-        yOffset += 1 # Sumamos blockSize al offset del eje Y para pintar abajo
+        yOffset += blockSize # Sumamos blockSize al offset del eje Y para pintar abajo
 
         
 
@@ -604,7 +603,7 @@ def drawMap():
 
 # Metodo para actualizar el jugador
 def tickPlayer():
-    global canClimb, isClimbing, isAlive, isInMenu, isPlaying, playerLives
+    global canClimb, playerX, playerY, isClimbing, isAlive, isInMenu, isPlaying, playerLives
     
     # Revisamos primero que nada si no estamos vivos para reiniciar todo
     if not isAlive:
@@ -616,62 +615,78 @@ def tickPlayer():
             playerLives = 3
         else:
             resetThings()
+        
     
-    if canMoveTo(math.floor(playerPosition[0]), math.floor(playerPosition[1]), movementVector, speedX, speedY):
+    if canMoveTo(playerX + playerWidth/2 + movementVector[0] * speedX, playerY + playerHeight + movementVector[1] * speedY, movementVector):
         # Movemos al jugador segun el vector movimiento
-        playerPosition[0] += movementVector[0] * speedX
-        playerPosition[1] += movementVector[1] * speedY
+        playerX += movementVector[0] * speedX
+        playerY += movementVector[1] * speedY
     
     # Chequeo si no me sali de la ventana
-    if playerPosition[0] > mapWidth:
-        playerPosition[0] = mapWidth-playerWidth
-    elif playerPosition[0] < 0:
-        playerPosition[0] = 0
+    if playerX+playerWidth > windowWidth:
+        playerX = windowWidth-playerWidth
+    elif playerX < 0:
+        playerX = 0
     
     # Como todo aqui tiene que ver con escalar, si isJumping entonces saltamos todo este codigo
     if isJumping:
         return
     
-    # Revisamos si esta parado sobre una escalera para permitirle subir
-    if (getMapValue(playerPosition[0], playerPosition[1]) == TILE_STAIRS) or (getMapValue(playerPosition[0], playerPosition[1]-1.0) == TILE_STAIRS):
+    # Revisamos si esta parado sobre una escalera para permitirle subir (Con el observador en los pies, izquierda)
+    if (getMapValue(playerX+(playerWidth/2), playerY+playerHeight) == TILE_STAIRS) or (getMapValue(playerX+(playerWidth/2), playerY+(playerHeight/2)) == TILE_STAIRS):
         canClimb = True
     else:
         canClimb = False
-        #isClimbing = False
     
-    # Si estamos subiendo, chequeamos si llegamos arriba en todo o abajo en todo
-    if isClimbing:
-        # Si estamos en BLANCO y abajo hay ESCALERAS significa que estabamos subiendo, llegamos arriba
-        # y nos pasamos.. por lo que debemos mover abajo 1 cuadro al jugador y poner que ya no estamos escalando
-        if (getMapValue(math.floor(playerPosition[0]), math.floor(playerPosition[1])) == TILE_NONE and
-            getMapValue(math.floor(playerPosition[0]), math.floor(playerPosition[1])+1.0) == TILE_STAIRS):
-            playerPosition[1] = math.floor(playerPosition[1])+1.0
-            isClimbing = False
-        # Si Estamos en PISO y arriba nuestro hay ESCALERAS quiere decir que estabamos bajando y llegamos
-        # abajo en todo, por lo que tenemos que decir que ya no estamos escalando y centrarnos en el piso que estamos
-        elif (getMapValue(math.floor(playerPosition[0]), math.floor(playerPosition[1])) == TILE_FLOOR and
-              getMapValue(math.floor(playerPosition[0]), math.floor(playerPosition[1])-1.0) == TILE_STAIRS):
-            isClimbing = False
-            playerPosition[1] = math.floor(playerPosition[1])
-        # Si por alguna razon lo de arriba falla, esto lo arregla
-        elif (getMapValue(math.floor(playerPosition[0]), math.floor(playerPosition[1])) == TILE_FLOOR and
-              getMapValue(math.floor(playerPosition[0]), math.floor(playerPosition[1])+1.0) == TILE_FLOOR):
-            playerPosition[1] = math.floor(playerPosition[1])-1.0
-            isClimbing = False
+    # Si esta subiendo y ya no puede subir, entonces es porque termino de subir y "se paso" de la escalera
+    # Por lo que hay que "bajarlo" al piso, para que pueda seguir moviendose
+    if isClimbing and not canClimb:
+        # Nueva posicion en funcion del mapa
+        newYPos = getYMapValue(playerY)
+        
+        # Esto arregla el bug al subir
+        # Si el actual no es nada, y el actual mas la altura del jugador mas el tamano de un bloque extra hay escalera, entonces sumar 1 a la posicion...
+        if (getMapValue(playerX+(playerWidth/2), playerY) == TILE_NONE) and (getMapValue(playerX+(playerWidth/2), playerY+playerHeight+blockSize) == TILE_STAIRS):
+            newYPos += 1
+        
+        # Creo la nueva posicion para pintar
+        playerY = newYPos*blockSize
+        isClimbing = False
+    
+    # Guardamos el valor previo de la Y, por si se cambia quiere decir que estaba bugeada
+    # la posicion, y se debe desactivar el isClimbing
+    prevPos = playerY
+    
+    # Revisamos si esta bugeada la posicion, y la arreglamos
+    if getMapValue(playerX+(playerWidth/2), playerY+playerHeight) == TILE_FLOOR:
+        playerY += fixStairsBug(playerX, playerY, playerWidth, playerHeight)
+    
+    # Chequeamos si la posicion previa es distinta a la posicion nueva, entonces desactivamos isClimbing
+    if prevPos != playerY:
+        isClimbing = False
         
 
 # Metodo para pintar el HUD del jugador
 def renderHUD():
-    drawString(1, 1, "Vidas: " + str(playerLives), "Consolas", getColor("white"), 32)  
-    drawString(20, 1, "x = " + str(playerPosition[0]), "Consolas", getColor("white"), 28)
-    drawString(20, 2, "y = " + str(playerPosition[1]), "Consolas", getColor("white"), 28)
+    drawString(15, 15, "Vidas: " + str(playerLives), "Consolas", getColor("white"), 32)  
+
+
+# Metodo para pintar el jugador
+def renderPlayer():    
+    global jumpOffset, canJump, isJumping, canClimb, actualImageToDraw
     
+    # Si estoy saltando, entonces obtengo el offset de salto y le cambio el signo
+    if isJumping:
+        jumpOffset = -math.sin((time.time() - jumpTimer)* jumpSpeed) * jumpHeight
     
-    
-    
-# Metodo para obtener la textura que vamos a usar para pintar
-def setPlayerActualTexture():
-    global actualImageToDraw
+    # Si el offset de salto es positivo, quiere decir que termino el salto (grafica del seno entre 0 y pi)
+    # entonces, reseteo todos los valores para poder escalar y saltar de nuevo..
+    if jumpOffset > 0:
+        jumpOffset = 0
+        canJump = True
+        canClimb = True
+        isJumping = False
+        
     
     # Actualizamos que textura se debe pintar mediante el vector movimiento
     if isClimbing:
@@ -727,41 +742,15 @@ def setPlayerActualTexture():
                 actualStatus = PIMAGE_WLEFT
                 
             actualImageToDraw = (actualStatus, actualImgId)
-    return actualImageToDraw
-    
-
-
-
-# Metodo para pintar el jugador
-def renderPlayer():    
-    global jumpOffset, canJump, isJumping, canClimb, actualImageToDraw
-    
-    # Si estoy saltando, entonces obtengo el offset de salto y le cambio el signo
-    if isJumping:
-        jumpOffset = -math.sin((time.time() - jumpTimer)* jumpSpeed) * jumpHeight
-    
-    # Si el offset de salto es positivo, quiere decir que termino el salto (grafica del seno entre 0 y pi)
-    # entonces, reseteo todos los valores para poder escalar y saltar de nuevo..
-    if jumpOffset > 0:
-        jumpOffset = 0
-        canJump = True
-        canClimb = True
-        isJumping = False
-        
-    # Setteamos la textura actual
-    setPlayerActualTexture()
-    
-    # Pintamos el rectangulo de area del jugador
-    drawRect(playerPosition[0], playerPosition[1] + jumpOffset, playerWidth, playerHeight, ((193 << 16) | (193 << 8) | 193))
     
     # Finalmente, pintamos
     status, imgId = actualImageToDraw
-    drawImageR(pImages[status][imgId], playerPosition[0], playerPosition[1] + jumpOffset, playerWidth, playerHeight)
+    drawImageR(pImages[status][imgId], playerX, playerY + jumpOffset, playerWidth, playerHeight)
     
     # Centro del jugador (Provisional)
-    drawRect(playerPosition[0], playerPosition[1], 0.3, 0.3, getColor("green"))
+    #drawRect(playerX, y, width, height, rgbColor)
 
-    #drawString(playerPosition[0], playerPosition[1] + jumpOffset-0.15, playerName, "Consolas", getColor("white"), 12)
+    drawString(playerX-(playerWidth/2), playerY + jumpOffset-15, playerName, "Consolas", getColor("white"), 12)
         
     # Pintamos el HUD del jugador
     renderHUD()
@@ -777,9 +766,9 @@ def inputPlayer(e):
         # Invertimos el valor de isPaused
         isPaused = not(isPaused)
         
-    # Si al invertirlo es TRUE, quiere decir que el juego esta pausado, saltamos todo este codigo
-    if isPaused:
-        return
+        # Si al invertirlo es TRUE, quiere decir que el juego esta pausado, saltamos todo este codigo
+        if isPaused:
+            return
     
     if (e == KEY_D or e == KEY_RIGHT or e == KEY_d) and not (isClimbing):
         movementVector = [1,0]
@@ -787,12 +776,12 @@ def inputPlayer(e):
     elif (e == KEY_A or e == KEY_LEFT or e == KEY_a) and not (isClimbing):
         movementVector = [-1,0]
         isWalking = True
-    elif (e == KEY_S or e == KEY_DOWN or e == KEY_s) and (canClimb or isClimbing):
+    elif (e == KEY_S or e == KEY_DOWN or e == KEY_s) and (canClimb):
         movementVector = [0,1]
         isWalking = False
         isClimbing = True
         canJump = False
-    elif (e == KEY_W or e == KEY_UP or e == KEY_w) and (canClimb or isClimbing):        
+    elif (e == KEY_W or e == KEY_UP or e == KEY_w) and (canClimb):
         movementVector = [0,-1]
         isWalking = False
         isClimbing = True
@@ -828,12 +817,9 @@ def inputPlayer(e):
 
 # Metodo para arreglar la posicion del monstruo al subir
 def getYFixed(mx, my, mHeight):
-    mx = math.floor(mx)
-    my = math.floor(my)
-    
-    if getMapValue(mx, my) == TILE_NONE:
-        return mHeight
-    return 0
+    if getMapValue(mx, my+mHeight) == TILE_NONE:
+        return my+blockSize
+    return my
 
 # Metodo para que se muevan los monstruos
 def tickMonsters():
@@ -842,23 +828,23 @@ def tickMonsters():
     # Recorremos todos los monstruos
     for i in range(0, len(mNames)):
         # Obtenemos la posicion del jugador respecto al mapa
-        playerPos = (math.floor(playerPosition[0]), math.floor(playerPosition[1]))
-
+        playerPos = (getXMapValue(playerX+playerWidth/2), getYMapValue(playerY+playerHeight))
+        
         # Arreglamos la Y del monstruo por si esta bugeada
-        mY[i] += getYFixed(mX[i], mY[i], mHeight[i])
+        mY[i] = getYFixed(mX[i], mY[i], mHeight[i])
         
         # Obtenemos la posicion del monstruo respecto al mapa
-        monsterPos = (math.floor(mX[i]), math.floor(mY[i]))
-
+        monsterPos = (getXMapValue(mX[i]), getYMapValue(mY[i]+mHeight[i]))
+        
         # Calculamos el camino
-        path = getPathTo(monsterPos, playerPos, [], [], [], 0)
+        path = getPathTo(monsterPos, playerPos, [], [], 0)
         
         if path == True or path == False:
             isAlive = False
             return
        
         # Obtenemos el vector de movimiento
-        mVector = getMovementVector(path, math.floor(mX[i]), math.floor(mY[i]))            
+        mVector = getMovementVector(path, mX[i], mY[i])            
         # Lo sumamos        
         if mVector[0] != 0:
             mX[i] += mSpeedX[i] * mVector[0]
@@ -868,7 +854,9 @@ def tickMonsters():
 
 
 # Metodo para pintar los monstruos
-def renderMonsters():    
+def renderMonsters():
+    monstersSurface = pygame.Surface((windowWidth, windowHeight), pygame.SRCALPHA)
+    
     # Pintamos todos los monstruos
     for i in range(0, len(mNames)):
         drawRect(mX[i], mY[i], mWidth[i], mHeight[i], getColor("green"))
@@ -893,7 +881,7 @@ def tickMenu():
 # Metodo para pintar el menu
 def renderMenu():        
     # Pintamos el mensaje principal "MENU"
-    drawString(15, 1.5, "Menu", "Consolas", getColor("white"), 102)
+    drawString(290, 30, "Menu", "Consolas", getColor("white"), 102)
     
     # Pintamos todas las opciones del menu
     for i in range(0, len(optionNames)):
@@ -1060,9 +1048,6 @@ def mainLoop():
 map = loadMap("crazylevel.png")    
 
 loadGameObjects()
-resetThings()
-
-#getPathTo((24, 7), (5, 24), [], [], [], 0)
 
 # Iniciamos el juego
 mainLoop()
