@@ -3,6 +3,7 @@ import sys
 import math
 import time
 import pygame
+import random
 from pygame.locals import *
 
 import PIL.Image
@@ -49,6 +50,7 @@ KEY_s = 115
 KEY_d = 100
 KEY_w = 119
 KEY_p = 112
+KEY_f = 102
 
 KEY_A = 65
 KEY_S = 83
@@ -57,6 +59,13 @@ KEY_W = 87
 KEY_P = 80
 KEY_ENTER = 13
 KEY_SPACE = 32
+
+# Colores constantes
+COLOR_FLOOR = 0xFF00FF
+COLOR_STAIRS = 0x00FF00
+COLOR_MEAT = 0x975016
+COLOR_BREAD = 0xFF9D00
+COLOR_LETTUCE = 0x62D551
 
 
 
@@ -93,6 +102,8 @@ global mapHeight
 blockSize = 20 # Tamano de cada imagen
 
 # Constantes mapa
+TILE_SIZE = 1 # Tamano de las texturas
+
 TILE_NULL = -1
 TILE_NONE = 0
 TILE_FLOOR = 1
@@ -100,7 +111,44 @@ TILE_STAIRS = 2
 TILE_PLAYER = 3
 TILE_MONSTER = 4
 TILE_BOTTOMSTAIRS = 5
+TILE_BREAD = 6
+TILE_MEAT = 7
+TILE_LETTUCE = 8
+WALKABLE_TILES = [1,2,6,7,8]
 
+
+# Propiedades de la pimienta
+pepperPos = [0, 0]
+pepperTime = 0
+pepperSize = 0.4
+pepperLastDir = 0
+PEPPER_SPEED = 0.05
+
+
+### ---------- Propiedades de la/s hamburguesas ------------
+# Posiciones
+breadPositions = []
+lettucePositions = []
+meatPositions = []
+
+# Temporizadores para controlar el pisado
+breadTimers = []
+lettuceTimers = []
+meatTimers = []
+
+# Destinos (para ver si un ingrediente esta bajando..)
+breadDestination = []
+lettuceDestination = []
+meatDestination = []
+
+breadFloors = []
+lettuceFloors = []
+meatFloors = []
+
+# Otros
+TIMETORESET = 2.000000000
+offsetWhenWalked = 0.2
+fallSpeed = 0.1
 
 
 ### ---------- Propiedades del Jugador ----------
@@ -133,13 +181,14 @@ pImages = [[0], # PIMAGE_STAND
            ]
 
 # Info del jugador
-playerLives = 3
+playerLifes = 3
 
 
 # Restricciones
 canClimb = False
 canWalk = True
 canJump = True
+canShoot = True
 
 
 # Estados
@@ -147,12 +196,13 @@ isAlive = True
 isClimbing = False
 isWalking = False
 isJumping = False
+isShooting = False
 
 
 # Posicion
 #playerX = 520 # Posicion inicial X
 #playerY = 420 # Posuicion inicial Y
-playerPosition = [3, 23]
+playerPosition = [3., 23.]
 
 
 
@@ -166,6 +216,7 @@ playerWidth = 1
 speedX = 0.11
 speedY = 0.08
 movementVector = [0,0] # [x,y] --> x {-1,0,1} ... y {-1,0,1}
+lastXMove = 0
 
 # Salto
 jumpHeight = 2
@@ -180,8 +231,8 @@ jumpSpeed = 3.5
 # Para anadir un monstruo simplemente se anade un valor extra a cada arreglo a gusto de consumidor XD
 
 # Valores iniciales
-mPosX = [24, 35.5]
-mPosY = [7, 20]
+mPosX = [24., 35.5]
+mPosY = [7., 20.]
 
 # Imagen que contiene todas las imagenes de los monstruos
 monstersGridName = ["grid.png", "grid.png"]
@@ -195,7 +246,7 @@ mGridSizeY = [2, 2]
 mImages = [[], []] 
 
 # Nombres
-mNames = ["ene1"] # "CuboRojo", "CuboAzul"
+mNames = ["Lentico"] # "CuboRojo", "CuboAzul"
 
 # Colores (Provisional)
 mColors = ["red", "blue"]
@@ -223,7 +274,7 @@ mWidth = [1, 1]
 
 
 # Movimiento
-mSpeedX = [0.1, 0.05]
+mSpeedX = [0.01, 0.05]
 mSpeedY = [0.01, 0.01]
 
 
@@ -249,16 +300,6 @@ def loadGameObjects():
             auxpImages[i].append(newImage)
     
     pImages = auxpImages;
-    
-
-
-# Metodo para resetear monstruos al morir
-def resetThings():
-    global mX, mY, playerPosition
-    mX = [20, 35.5] # Posicion inicial X
-    mY = [21, 20] # Posuicion inicial Y
-    
-    playerPosition = [3, 23]
 
     
 # Metodo para "soltar" las teclas del teclado
@@ -296,6 +337,14 @@ def getColor(name):
         return (255,0,255)
     elif name == "orange":
         return (255, 128, 0)
+    elif name == "bread":
+        return (255, 157, 0)
+    elif name == "meat":
+        return (151, 80, 22)
+    elif name == "lettuce":
+        return (98, 213, 81)
+    elif name == "cyan":
+        return (0, 255, 255)
     
 # Metodo para cargar una imagen
 def loadImage(filePath):
@@ -304,6 +353,7 @@ def loadImage(filePath):
 
 # Metodo para cargar el mapa de una imagen (pixel a pixel)
 def loadMap(filePath):
+    global breadPositions, meatPositions, lettucePositions
     # Renombramos la ruta a la carpeta de mapas
     filePath = "../res/maps/" + filePath
     
@@ -324,6 +374,13 @@ def loadMap(filePath):
     mapWidth = ix
     global mapHeight
     mapHeight = iy
+    
+    # Contadores para ir anadiendo objetos leidos
+    cBread = -1 
+    cLettuce = -1
+    cMeat = -1
+    
+    sameObject = False
 
     # Recorremos todos los pixels de la imagen
     for y in range(0, iy):
@@ -336,14 +393,71 @@ def loadMap(filePath):
 
             # Chequeamos si es el color
             if (rgb & 0xFFFFFF) == 0: # Negro (Nada)
+                sameObject = False
                 mapReaded.append(TILE_NONE)
-            elif (rgb ^ 0xFFFFFF) == 0x00FF00: # Rosado (Piso)
+            elif rgb == COLOR_FLOOR:
+                sameObject = False
                 mapReaded.append(TILE_FLOOR)
-            elif (rgb ^ 0xFFFFFF) == 0xFF00FF: # Verde (Escaleras)
+            elif rgb == COLOR_STAIRS:
+                sameObject = False
                 mapReaded.append(TILE_STAIRS)
+            # ========== PAN ==========
+            elif rgb == COLOR_BREAD:
+                mapReaded.append(TILE_FLOOR)
+                # Si NO es el mismo objeto previo que estabamos anadiendo, entonces
+                # Es porque este es un nuevo objeto y debemos crearlo..
+                # La siguiente vez que entre (con el siguiente pixel) si es igual un pan
+                # Entonces va a pegar el pan en la posicion actual en vez de "crear" un 
+                # nuevo objeto de pan
+                if not sameObject: 
+                    sameObject = True
+                    cBread += 1
+                    breadPositions.append([])
+                    breadTimers.append([])
+                    breadDestination.append(0)
+                    breadFloors.append(0)
+
+                breadPositions[cBread].append((x, y))
+                breadTimers[cBread].append(0)
+            # ========== CARNE ==========
+            elif rgb == COLOR_MEAT:
+                mapReaded.append(TILE_FLOOR)
+                # Si NO es el mismo objeto previo que estabamos anadiendo, entonces
+                # Es porque este es un nuevo objeto y debemos crearlo..
+                # La siguiente vez que entre (con el siguiente pixel) si es igual una carne
+                # Entonces va a pegar la carne en la posicion actual en vez de "crear" un 
+                # nuevo objeto de carne
+                if not sameObject: 
+                    sameObject = True
+                    cMeat += 1
+                    meatPositions.append([])
+                    meatTimers.append([])
+                    meatDestination.append(0)
+                    meatFloors.append(0)
+
+                meatPositions[cMeat].append((x, y)) 
+                meatTimers[cMeat].append(0)
+            # ========== LECHUGA ==========
+            elif rgb == COLOR_LETTUCE:
+                mapReaded.append(TILE_FLOOR)
+                # Si NO es el mismo objeto previo que estabamos anadiendo, entonces
+                # Es porque este es un nuevo objeto y debemos crearlo..
+                # La siguiente vez que entre (con el siguiente pixel) si es igual una lechuga
+                # Entonces va a pegar la lechuga en la posicion actual en vez de "crear" un 
+                # nuevo objeto de lechuga
+                if not sameObject: 
+                    sameObject = True
+                    cLettuce += 1
+                    lettucePositions.append([])
+                    lettuceTimers.append([])
+                    lettuceDestination.append(0)
+                    lettuceFloors.append(0)
+
+                lettucePositions[cLettuce].append((x, y))
+                lettuceTimers[cLettuce].append(0) 
             else:
+                sameObject = False
                 mapReaded.append(TILE_NULL)
-            # Faltan los otros colores....
             
     # Retornamos el mapa leido
     return mapReaded
@@ -357,6 +471,24 @@ def getMapValue(x, y):
     if x + y * mapWidth >= 0 and x < mapWidth:
         return map[x + y * mapWidth]
     return 0
+
+
+# Metodo para obtener la coordenada X de el punto generado random
+def convertToMapX(pos):
+    return pos % mapWidth
+
+# Metodo para obtener la coordenada Y de el punto generado random
+def convertToMapY(pos):
+    return math.floor(pos / mapWidth)
+
+
+# Metodo para obtener una posicion aleatoria en el mapa
+def getRandomMapPosition():
+    while True:
+        r = random.randint(0, mapWidth*mapHeight)
+        if map[r] == TILE_FLOOR:
+            return r
+        
 
 
 # Metodo para evitar que se meta por el piso al bajar
@@ -374,23 +506,17 @@ def canMoveTo(x, y, movementVector, sx, sy): # sx = speedX
     vx = movementVector[0]
     vy = movementVector[1]
     
-    #print("Estoy en ", x, ",", y)
-    #print("Voy para ", vx, ",", vy)
-    
-    if getMapValue(math.floor(x + sx + vx), math.floor(y + sy + vy)) == TILE_FLOOR or getMapValue(math.floor(x + sx + vx), math.floor(y + sy + vy)) == TILE_STAIRS:
-        #print("Si me puedo mvoverr")
+    if getMapValue(math.floor(x + sx + vx), math.floor(y + sy + vy)) in WALKABLE_TILES:
         return True
     elif isClimbing:
-        #print("Si me puedo mover, estoy en escaleras")
         return True
     else:
-        #print("NO PUEDO")
         return False
     
 
 # Metodo para obtener los "hijos" de una coordenada dentro de la matriz
 # Los hijos de una coordenada son aquellos valores que son caminables dentro de la matriz (piso, escaleras)
-def getChilds(x, y, visited):
+def getChilds(x, y, visited, allPaths):
     # Como solamente nos podemos mover en 4 direcciones solo debemos ver esas direcciones
     # Creamos la matriz de hijos que vamos a devolver
     allChilds = []
@@ -399,23 +525,24 @@ def getChilds(x, y, visited):
     up = getMapValue(x, y-1)
     down = getMapValue(x, y+1)
     left = getMapValue(x-1, y)
-    right = getMapValue(x+1, y)
-    
-    # Si arriba hay piso/escalera y no he visitado ese nodo, es un hijo valido
-    if (up == TILE_STAIRS or up == TILE_BOTTOMSTAIRS) and not((x, y-1) in visited):
-        allChilds.append((x, y-1))
-        
-    # Si abajo hay piso/escalera y no he visitado ese nodo, es un hijo valido
-    if (down == TILE_STAIRS or down == TILE_FLOOR) and not((x, y+1) in visited):
-        allChilds.append((x, y+1))
+    right = getMapValue(x+1, y)            
+            
         
     # Si a la izquierda hay piso/escalera y no he visitado ese nodo, es un hijo valido
-    if (left == TILE_FLOOR or left == TILE_STAIRS) and not((x-1, y) in visited):
+    if (left in WALKABLE_TILES) and (not((x-1, y) in visited) or ((x, y-1) in allPaths)):
         allChilds.append((x-1, y))
         
     # Si a la derecha hay piso/escalera y no he visitado ese nodo, es un hijo valido
-    if (right == TILE_FLOOR or right == TILE_STAIRS) and not((x+1, y) in visited):
+    if (right in WALKABLE_TILES) and (not((x+1, y) in visited) or ((x, y-1) in allPaths)):
         allChilds.append((x+1, y))
+        
+    # Si arriba hay piso/escalera y no he visitado ese nodo, es un hijo valido
+    if (up in WALKABLE_TILES) and (not((x, y-1) in visited) or ((x, y-1) in allPaths)):
+        allChilds.append((x, y-1))
+        
+    # Si abajo hay piso/escalera y no he visitado ese nodo, es un hijo valido
+    if (down in WALKABLE_TILES) and (not((x, y+1) in visited) or ((x, y-1) in allPaths)):
+        allChilds.append((x, y+1))
         
     return allChilds
     
@@ -432,7 +559,7 @@ def getPathTo(a, b, path, visited, allPaths, iteration):
     ax, ay = a
 
     # Buscamos los hijos
-    aChilds = getChilds(ax, ay, visited)
+    aChilds = getChilds(ax, ay, visited, allPaths)
 
     # Si A no tiene hijos, llegamos a una calle ciega
     if len(aChilds) == 0: 
@@ -490,6 +617,7 @@ def getPathTo(a, b, path, visited, allPaths, iteration):
 # La posicion X,Y del objeto a mover, la velocidad X,Y para ese objeto
 # Devuelve un vector movimiento
 def getMovementVector(p, ex, ey):
+    global lastXMove
     # Obtenemos las coordenadas del punto p
     px, py = p[0]
 
@@ -508,6 +636,35 @@ def getMovementVector(p, ex, ey):
     return mVector
     
     
+
+# Metodo para obtener posiciones random en todos las entidades del juego
+def initActors():
+    global mX, mY, playerPosition, canClimb, canWalk, canJump, canShoot, isClimbing, isWalking, isJumping, isShooting
+    
+    # Reiniciamos los estados por si morimos subiendo una escalera
+    canClimb = False
+    canWalk = True
+    canJump = True
+    canShoot = True
+    isClimbing = False
+    isWalking = False
+    isJumping = False
+    isShooting = False
+    
+    # Le asignamos una posicion random al jugador
+    r = getRandomMapPosition()
+    playerPosition = [convertToMapX(r), convertToMapY(r)]    
+    
+    # Inicializamos en vacio las posiciones de los monstruos
+    mX = []
+    mY = []
+    
+    # Le asignamos una posicion random a cada monstruo
+    for m in range(0, len(mNames)):
+        r = getRandomMapPosition()
+        mX.append(convertToMapX(r))
+        mY.append(convertToMapY(r))
+
 
 # =====================================================================================
 # =====================================================================================
@@ -585,15 +742,321 @@ def drawMap():
                 actColor = "black"
             
             # Pintamos el bloque
-            drawRect(xOffset, yOffset, 1, 1, getColor(actColor))
+            drawRect(xOffset, yOffset, TILE_SIZE, TILE_SIZE, getColor(actColor))
             
             # Actualizamos los offset
-            xOffset += 1 # Podriamos tener 1 solo offset ya que son iguales
+            xOffset += TILE_SIZE # Podriamos tener 1 solo offset ya que son iguales
             
         xOffset = 0 # Reiniciamos el offset del eje X para comenzar a pintar desde 0
-        yOffset += 1 # Sumamos blockSize al offset del eje Y para pintar abajo
+        yOffset += TILE_SIZE # Sumamos blockSize al offset del eje Y para pintar abajo
 
         
+
+# =====================================================================================
+# =====================================================================================
+# =============================== Metodos Hamburguesa =================================
+# =====================================================================================
+# =====================================================================================
+
+# Metodo para obtener el numero de entidades que estan encima de los ingredientes
+def getNumberOfEntitiesOn(ingredient):
+    total = 0
+    # Recorremos cada coordenada del ingrediente a ver si hay alguien encima
+    for i in range(0, len(ingredient)):
+        # Obtenemos las coordenadas x,y de ese punto
+        ix, iy = ingredient[i]
+        
+        # Revisamos el jugador
+        if ix == math.floor(playerPosition[0]) and iy == math.floor(playerPosition[1]):
+            total += 1
+        
+        # Revisamos cada monstruo
+        for m in range(0, len(mNames)):
+            if ix == math.floor(mX[m]) and iy == math.floor(mY[m]):
+                total += 1
+        
+    print("Va a bajar ", total)
+    return total
+    
+    
+
+# Metodo para bajar un ingrediente al siguiente nivel
+# Le pasamos como parametro la matriz de posiciones del ingrediente
+def moveDown(ingredient, numberOfFloors):
+    if numberOfFloors == 0:
+        return
+    # Primero tomo el valor Y
+    x, y = ingredient[0]
+    
+    # Coincidencias de piso (Para bajar n pisos)
+    coincidences = 0
+    
+    # Busco donde esta la siguiente plataforma desde esa Y hacia abajo
+    nextY = 1
+    while True:
+        if getMapValue(x, y + nextY) == TILE_FLOOR:
+            coincidences += 1
+            if coincidences == numberOfFloors:
+                break
+        nextY += 1
+        # Chequeo que no haya llegado abajo en todo
+        # Porque de ser asi, estoy bajando de la ultima plataforma hacia abajo
+        if y + nextY > mapHeight-12:
+            break
+
+    return y+nextY
+
+# Metodo para resetear el timer de un ingrediente
+# Le pasamos como parametro la matriz de timer del ingrediente
+def resetTimer(ingredient):
+    for i in range(0, len(ingredient)):
+        ingredient[i] = 0
+    return ingredient
+              
+                
+# Metodo para ver si el ingrediente enviado como parametro colisiona con algun otro ingrediente                
+def checkCollision(ingredient, numberOfFloors):
+    global breadDestination, lettuceDestination, meatDestination
+    
+    # Obtenemos las coordenadas del parametro
+    ix, iy = ingredient[0]
+    
+    # Chequeamos colision en los panes
+    for p in range(0, len(breadPositions)):
+        if ingredient == breadPositions[p]:
+            continue
+        px, py = breadPositions[p][0]
+        if ix == px and math.floor(iy+1) == py:
+            breadDestination[p] = moveDown(breadPositions[p], numberOfFloors)
+    
+    # Chequeamos colision en las lechugas
+    for l in range(0, len(lettucePositions)):
+        if ingredient == lettucePositions[l]:
+            continue
+        lx, ly = lettucePositions[l][0]
+        if ix == lx and math.floor(iy+1) == ly:
+            lettuceDestination[l] = moveDown(lettucePositions[l], numberOfFloors)
+    
+    # Chequeamos colision en las carnes
+    for c in range(0, len(meatPositions)):
+        if ingredient == meatPositions[c]:
+            continue
+        cx, cy = meatPositions[c][0]
+        if ix == cx and math.floor(iy+1) == cy:
+            meatDestination[c] = moveDown(meatPositions[c], numberOfFloors)
+        
+        
+    
+    
+
+# Metodo para actualizar las posiciones de los ingredientes que estan cayendo
+def tickIngredients():
+    global breadDestination, breadPositions, lettuceDestination, lettucePositions, meatDestination, meatPositions
+    
+    # Recorremos todos los panes
+    for p in range(0, len(breadDestination)):
+        if breadDestination[p] == 0:
+            continue
+        # Recorremos todas las posiciones para ir bajandolas
+        for i in range(0, len(breadPositions[p])):
+            x, y = breadPositions[p][i]
+            y += fallSpeed
+            if y > breadDestination[p]:
+                y = breadDestination[p]                
+            # Asignamos el nuevo valor
+            breadPositions[p][i] = (x, y)
+        # Chequeamos la colision
+        checkCollision(breadPositions[p], breadFloors)
+        # Vemos si llegamos al destino para quitar el "destino"
+        x, y = breadPositions[p][0]
+        if y == breadDestination[p]:
+            breadDestination[p] = 0
+            
+    
+    # Recorremos todas las lechugas
+    for l in range(0, len(lettuceDestination)):
+        if lettuceDestination[l] == 0:
+            continue
+        # Recorremos todas las posiciones para ir bajandolas
+        for i in range(0, len(lettucePositions[l])):
+            x, y = lettucePositions[l][i]
+            y += fallSpeed
+            if y > lettuceDestination[l]:
+                y = lettuceDestination[l]                
+            # Asignamos el nuevo valor
+            lettucePositions[l][i] = (x, y)
+        # Chequeamos la colision
+        checkCollision(lettucePositions[l], lettuceFloors)
+        # Vemos si llegamos al destino para quitar el "destino"
+        x, y = lettucePositions[l][0]
+        if y == lettuceDestination[l]:
+            lettuceDestination[l] = 0
+            
+            
+    # Recorremos todas las carnes
+    for c in range(0, len(meatDestination)):
+        if meatDestination[c] == 0:
+            continue
+        # Recorremos todas las posiciones para ir bajandolas
+        for i in range(0, len(meatPositions[c])):
+            x, y = meatPositions[c][i]
+            y += fallSpeed
+            if y > meatDestination[c]:
+                y = meatDestination[c]                
+            # Asignamos el nuevo valor
+            meatPositions[c][i] = (x, y)
+        # Chequeamos la colision
+        checkCollision(meatPositions[c], meatFloors)
+        # Vemos si llegamos al destino para quitar el "destino"
+        x, y = meatPositions[c][0]
+        if y == meatDestination[c]:
+            meatDestination[c] = 0
+            
+        
+    
+
+# Metodo para poder llevar a cabo el "bajar" las partes
+def tickHamburguers():
+    global breadTimers, lettuceTimers, meatTimers, breadDestination, lettuceDestination, meatDestination, breadFloors, lettuceFloors, meatFloors
+    # Revisamos si pisamos alguno de los cuadros de los objetos primero.. 
+    # De ser asi, iniciamos un temporizador para mantener ese cuadro pisado por X tiempo
+    # Y ver si el ingrediente cae
+    
+    # Primero setteamos el timer de lo que estemos pisando y reiniciamos los que no
+    # Recorremos todos los panes
+    for p in range(0, len(breadPositions)):
+        # Recorremos todas las posiciones del pan actual
+        for i in range(0, len(breadPositions[p])):
+            # Vemos si estamos pisando el actual para settearle el tiempo
+            x, y = breadPositions[p][i]
+            if math.floor(playerPosition[0]) == x and math.floor(playerPosition[1]) == y:
+                breadTimers[p][i] = time.time()
+            
+            # Vemos si se cumplio el tiempo para resetear el tiempo
+            if time.time() - breadTimers[p][i] > TIMETORESET:
+                breadTimers[p][i] = 0
+    
+    
+    # Recorremos todas las lechugas
+    for l in range(0, len(lettucePositions)):
+        # Recorremos todas las posiciones de la lechuga actual
+        for i in range(0, len(lettucePositions[l])):
+            # Vemos si estamos pisando el actual para settearle el tiempo
+            x, y = lettucePositions[l][i]
+            if math.floor(playerPosition[0]) == x and math.floor(playerPosition[1]) == y:
+                lettuceTimers[l][i] = time.time()
+                
+            # Vemos si se cumplio el tiempo para resetear el tiempo
+            if time.time() - lettuceTimers[l][i] > TIMETORESET:
+                lettuceTimers[l][i] = 0
+
+
+    # Recorremos todas las carnes
+    for c in range(0, len(meatPositions)):
+        # Recorremos todas las posiciones de la carne actual
+        for i in range(0, len(meatPositions[c])):
+            # Vemos si estamos pisando el actual para settearle el tiempo
+            x, y = meatPositions[c][i]
+            if math.floor(playerPosition[0]) == x and math.floor(playerPosition[1]) == y:
+                meatTimers[c][i] = time.time()
+                
+            # Vemos si se cumplio el tiempo para resetear el tiempo
+            if time.time() - meatTimers[c][i] > TIMETORESET:
+                meatTimers[c][i] = 0
+                
+                
+    # Luego vemos si algun ingrediente ya fue todo pisado para bajarlo
+    # Revisamos los panes
+    for p in range(0, len(breadTimers)):
+        # Creamos una variable para ver cuantos items del objeto actual
+        # Estan pisados
+        checkedItems = 0
+        # Recorremos todos los cuadros del ingrediente actual
+        for i in range(0, len(breadTimers[p])):
+            # Si es distinto de cero, esta pisado y sumo 1 al contador
+            if breadTimers[p][i] != 0:
+                checkedItems += 1
+        # Luego, verifico si el numero de pisados es igual a la longitud del ingrediente
+        if checkedItems == len(breadTimers[p]):
+            breadFloors = getNumberOfEntitiesOn(breadPositions[p])
+            breadDestination[p] = moveDown(breadPositions[p], breadFloors)
+            breadTimers[p] = resetTimer(breadTimers[p])
+            
+            
+    # Revisamos las lechugas
+    for l in range(0, len(lettuceTimers)):
+        # Creamos una variable para ver cuantos items del objeto actual
+        # Estan pisados
+        checkedItems = 0
+        # Recorremos todos los cuadros del ingrediente actual
+        for i in range(0, len(lettuceTimers[l])):
+            # Si es distinto de cero, esta pisado y sumo 1 al contador
+            if lettuceTimers[l][i] != 0:
+                checkedItems += 1
+        # Luego, verifico si el numero de pisados es igual a la longitud del ingrediente
+        if checkedItems == len(lettuceTimers[l]):
+            lettuceFloors = getNumberOfEntitiesOn(lettucePositions[l])
+            lettuceDestination[l] = moveDown(lettucePositions[l], lettuceFloors)
+            lettuceTimers[l] = resetTimer(lettuceTimers[l])
+            
+            
+    # Revisamos las carnes
+    for c in range(0, len(meatTimers)):
+        # Creamos una variable para ver cuantos items del objeto actual
+        # Estan pisados
+        checkedItems = 0
+        # Recorremos todos los cuadros del ingrediente actual
+        for i in range(0, len(meatTimers[c])):
+            # Si es distinto de cero, esta pisado y sumo 1 al contador
+            if meatTimers[c][i] != 0:
+                checkedItems += 1
+        # Luego, verifico si el numero de pisados es igual a la longitud del ingrediente
+        if checkedItems == len(meatTimers[c]):
+            meatFloors = getNumberOfEntitiesOn(meatPositions[c])
+            meatDestination[c] = moveDown(meatPositions[c], meatFloors)
+            meatTimers[c] = resetTimer(meatTimers[c])
+    
+    tickIngredients()
+    
+
+# Metodo para pintar las hamburguesas
+def renderHamburguers():
+    # Pintamos los panes
+    # Recorremos todos los panes
+    for p in range(0, len(breadPositions)):
+        # Recorremos todas las posiciones del pan actual
+        for i in range(0, len(breadPositions[p])):
+            x, y = breadPositions[p][i]
+            # Si el ingrediente esta pisado, lo pintaremos 10px mas abajo
+            offset = 0
+            if breadTimers[p][i] != 0:
+                offset = offsetWhenWalked
+            drawRect(x, y + offset, TILE_SIZE, TILE_SIZE, getColor("bread"))
+    
+    # Pintamos las lechugas
+    # Recorremos todas las lechugas
+    for l in range(0, len(lettucePositions)):
+        # Recorremos todas las posiciones de la lechuga actual
+        for i in range(0, len(lettucePositions[l])):
+            x, y = lettucePositions[l][i]            
+            # Si el ingrediente esta pisado, lo pintaremos 10px mas abajo
+            offset = 0
+            if lettuceTimers[l][i] != 0:
+                offset = offsetWhenWalked
+            drawRect(x, y + offset, TILE_SIZE, TILE_SIZE, getColor("lettuce"))
+
+    # Pintamos las carnes
+    # Recorremos todas las carnes
+    for c in range(0, len(meatPositions)):
+        # Recorremos todas las posiciones de la carne actual
+        for i in range(0, len(meatPositions[c])):
+            x, y = meatPositions[c][i]
+            # Si el ingrediente esta pisado, lo pintaremos 10px mas abajo
+            offset = 0
+            if meatTimers[c][i] != 0:
+                offset = offsetWhenWalked
+            drawRect(x, y + offset, TILE_SIZE, TILE_SIZE, getColor("meat"))
+
 
 
 # =====================================================================================
@@ -602,20 +1065,68 @@ def drawMap():
 # =====================================================================================
 # =====================================================================================
 
+# Metodo para activar el disparo
+def shootPepper():
+    global canShoot, isShooting, pepperTime
+    if canShoot and not isShooting:
+        canShoot = False
+        isShooting = True
+        pepperTime = time.time()
+        
+
+# Metodo para pintar la pimienta
+def renderPepper():
+    global isShooting, canShoot
+    
+    if not isShooting:
+        return
+    
+    # Si estamos disparando, entonces pintamos la pimienta en la posicion X
+    # Y vamos a ir sumando el  inverso del primer cuadrante del coseno
+    cos = (1 - math.cos((time.time() - pepperTime) * 2))
+    
+    # Si ya se cumplio el primer cuadrante, no pintamos y le activamos que pueda disparar de nuevo
+    if cos >= 1:
+        isShooting = False
+        canShoot = True
+        return
+    
+    # Pintamos la pimienta
+    drawRect(pepperPos[0], pepperPos[1] + cos, pepperSize, pepperSize, getColor("cyan"))
+    
+    
+
+# Metodo para mover la pimienta
+def tickPepper():
+    global pepperPos, playerPosition, pepperLastDir
+    
+    # Si no estamos disparando, actualizamos la posicion de la pimienta
+    if not isShooting:
+        pepperPos[0] = playerPosition[0]
+        pepperPos[1] = playerPosition[1]
+        pepperLastDir = lastXMove
+        return
+    
+    # Si estamos disparando aumentamos la X
+    pepperPos[0] += pepperLastDir * PEPPER_SPEED         
+
+
 # Metodo para actualizar el jugador
 def tickPlayer():
-    global canClimb, isClimbing, isAlive, isInMenu, isPlaying, playerLives
+    global canClimb, isClimbing, isAlive, isInMenu, isPlaying, playerLifes
+    
+    tickPepper()
     
     # Revisamos primero que nada si no estamos vivos para reiniciar todo
     if not isAlive:
         isAlive = True
-        playerLives -= 1
-        if playerLives < 0:
+        playerLifes -= 1
+        if playerLifes < 0:
             isInMenu = True
             isPlaying = False
-            playerLives = 3
+            playerLifes = 3
         else:
-            resetThings()
+            initActors()
     
     if canMoveTo(math.floor(playerPosition[0]), math.floor(playerPosition[1]), movementVector, speedX, speedY):
         # Movemos al jugador segun el vector movimiento
@@ -637,7 +1148,6 @@ def tickPlayer():
         canClimb = True
     else:
         canClimb = False
-        #isClimbing = False
     
     # Si estamos subiendo, chequeamos si llegamos arriba en todo o abajo en todo
     if isClimbing:
@@ -662,12 +1172,11 @@ def tickPlayer():
 
 # Metodo para pintar el HUD del jugador
 def renderHUD():
-    drawString(1, 1, "Vidas: " + str(playerLives), "Consolas", getColor("white"), 32)  
+    drawString(1, 1, "Vidas: " + str(playerLifes), "Consolas", getColor("white"), 32)  
     drawString(20, 1, "x = " + str(playerPosition[0]), "Consolas", getColor("white"), 28)
     drawString(20, 2, "y = " + str(playerPosition[1]), "Consolas", getColor("white"), 28)
     
-    
-    
+  
     
 # Metodo para obtener la textura que vamos a usar para pintar
 def setPlayerActualTexture():
@@ -705,7 +1214,7 @@ def setPlayerActualTexture():
                 # Chequeamos no pasarnos del limite de spritesheets
                 if actualImgId >= len(pImages[actualStatus]):
                     actualImgId = 0                
-            # Sino, setteamos el nuevo spritesheet y comenzamos de 0
+            # Sino, setteamos el nuevo spritesheet y comenzamos de 0w
             else:
                 actualImgId = 0
                 actualStatus = PIMAGE_WRIGHT
@@ -760,18 +1269,19 @@ def renderPlayer():
     
     # Centro del jugador (Provisional)
     drawRect(playerPosition[0], playerPosition[1], 0.3, 0.3, getColor("green"))
-
-    #drawString(playerPosition[0], playerPosition[1] + jumpOffset-0.15, playerName, "Consolas", getColor("white"), 12)
         
     # Pintamos el HUD del jugador
     renderHUD()
+    
+    # Pintamos la pimienta que lanzamos (si es que la lanzamos)
+    renderPepper()
     
     
 
 # Metodo para activar el teclado en modo jugador
 def inputPlayer(e):
-    global playerX, playerY, enterPressed, isClimbing, canJump, isJumping, jumpTimer, canClimb, isPaused, movementVector, isWalking
-
+    global playerX, playerY, enterPressed, isClimbing, canJump, isJumping, jumpTimer, canClimb, isPaused, movementVector, lastXMove, isWalking
+    
     # Primero chequeamos si se pauso el juego, para asi saltar todo este codigo
     if e == KEY_P or e == KEY_p:
         # Invertimos el valor de isPaused
@@ -783,9 +1293,11 @@ def inputPlayer(e):
     
     if (e == KEY_D or e == KEY_RIGHT or e == KEY_d) and not (isClimbing):
         movementVector = [1,0]
+        lastXMove = 1
         isWalking = True
     elif (e == KEY_A or e == KEY_LEFT or e == KEY_a) and not (isClimbing):
         movementVector = [-1,0]
+        lastXMove = -1
         isWalking = True
     elif (e == KEY_S or e == KEY_DOWN or e == KEY_s) and (canClimb or isClimbing):
         movementVector = [0,1]
@@ -812,6 +1324,9 @@ def inputPlayer(e):
         canClimb = False
         jumpTimer = time.time() # Parametro para el seno
     
+    # Pimienta
+    if e == KEY_f:
+        shootPepper()
         
     if e == KEY_ENTER:
         enterPressed = True
@@ -872,7 +1387,7 @@ def renderMonsters():
     # Pintamos todos los monstruos
     for i in range(0, len(mNames)):
         drawRect(mX[i], mY[i], mWidth[i], mHeight[i], getColor("green"))
-        drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "Consolas", getColor("white"), 12)
+        #drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "Consolas", getColor("white"), 12)
         
         
         
@@ -923,6 +1438,7 @@ def inputMenu(e):
         if selectedOption == MENU_PLAY:
             isInMenu = False
             isPlaying = True
+            initActors()
         elif selectedOption == MENU_EXIT:
             sys.exit()
     
@@ -942,6 +1458,9 @@ def renderGame():
     # Pintamos el mapa
     drawMap()
     
+     # Luego de haber pintado el mapa, pintamos las hamburguesas
+    renderHamburguers()
+    
     # Pintamos el jugador
     renderPlayer()
     
@@ -950,7 +1469,7 @@ def renderGame():
     
     # Si esta pausado el juego, pintamos un Texto que nos lo diga
     if isPaused:
-        drawString(windowWidth/4, windowHeight/4, "PAUSA", "Consolas", getColor("white"), 140)
+        drawString(mapWidth/4, mapHeight/4, "PAUSA", "Consolas", getColor("white"), 140)
     
     
 # Actualizar el juego (cuando se esta jugando)
@@ -959,6 +1478,7 @@ def tickGame():
     if not isPaused:
         tickMonsters()
         tickPlayer()
+        tickHamburguers()
 
 
 
@@ -1057,12 +1577,9 @@ def mainLoop():
 # =====================================================================================
 
 # Leemos el mapa del archivo
-map = loadMap("crazylevel.png")    
+map = loadMap("level1.png")    
 
 loadGameObjects()
-resetThings()
-
-#getPathTo((24, 7), (5, 24), [], [], [], 0)
 
 # Iniciamos el juego
 mainLoop()
