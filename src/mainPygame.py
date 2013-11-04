@@ -38,6 +38,10 @@ isSelectingProfile = False
 isPlaying = False
 isPaused = False
 isRunning = True
+isSelectingLevel = False
+isSwitchingLevel = False
+levelSelected = 1
+actualLevel = 1
 
 
 # "Constantes" Teclado
@@ -60,12 +64,36 @@ KEY_P = 80
 KEY_ENTER = 13
 KEY_SPACE = 32
 
+KEY_1 = 49
+KEY_2 = 50
+KEY_3 = 51
+KEY_4 = 52
+KEY_5 = 53
+KEY_6 = 54
+KEY_7 = 55
+KEY_8 = 56
+KEY_9 = 57
+
+KEY_NUMPAD1 = 257
+KEY_NUMPAD2 = 258
+KEY_NUMPAD3 = 259
+KEY_NUMPAD4 = 260
+KEY_NUMPAD5 = 261
+KEY_NUMPAD6 = 262
+KEY_NUMPAD7 = 263
+KEY_NUMPAD8 = 264
+KEY_NUMPAD9 = 265
+
 # Colores constantes
 COLOR_FLOOR = 0xFF00FF
 COLOR_STAIRS = 0x00FF00
 COLOR_MEAT = 0x975016
 COLOR_BREAD = 0xFF9D00
 COLOR_LETTUCE = 0x62D551
+
+COLOR_EGG = 0xFFEB89
+COLOR_SAUSAGE = 0xFF3B14
+COLOR_GHERKIN = 0x1F6821
 
 
 
@@ -95,11 +123,17 @@ lastTimeKeyPressed = 0
 
 
 
-### Propiedades del mapa
+### ---------- Propiedades del mapa ----------
+
 map = []
 global mapWidth
 global mapHeight
 blockSize = 20 # Tamano de cada imagen
+
+# Imagenes
+MAP_FILES_PATH = "../res/textures/map/"
+global mapFloorImage
+global mapStairsImage
 
 # Constantes mapa
 TILE_SIZE = 1 # Tamano de las texturas
@@ -122,10 +156,19 @@ pepperPos = [0, 0]
 pepperTime = 0
 pepperSize = 0.4
 pepperLastDir = 0
-PEPPER_SPEED = 0.05
+PEPPER_SPEED = 0.08
 
 
 ### ---------- Propiedades de la/s hamburguesas ------------
+# Imagenes
+BREAD_PATH = "../res/textures/game/hamburguer/bread/"
+LETTUCE_PATH = "../res/textures/game/hamburguer/lettuce/"
+MEAT_PATH = "../res/textures/game/hamburguer/meat/"
+
+breadImages = []
+lettuceImages = []
+meatImages = []
+
 # Posiciones
 breadPositions = []
 lettucePositions = []
@@ -149,12 +192,12 @@ meatFloors = []
 TIMETORESET = 2.000000000
 offsetWhenWalked = 0.2
 fallSpeed = 0.1
+INGREDIENTS_FLOOR = 29
 
 
 ### ---------- Propiedades del Jugador ----------
 
-# Valores iniciales
-pPos = [3, 23]
+SCORE = 0
 
 # Constantes de las imagenes
 PIMAGE_STAND = 0
@@ -175,8 +218,8 @@ allPlayerImagesPath = [ "../res/textures/game/player/stand/", # PIMAGE_STAND
 
 # Imagenes del jugador, crearemos solamente los array en blanco con el numero de imagenes que son
 pImages = [[0], # PIMAGE_STAND
-           [0,0,0], # PIMAGE_WRIGHT   Como tenemos 3 imagenes para caminar a la derecha, inicializamos con 3 ceros
-           [0,0,0], # PIMAGE_WLEFT
+           [0,0], # PIMAGE_WRIGHT   Como tenemos 3 imagenes para caminar a la derecha, inicializamos con 3 ceros
+           [0,0], # PIMAGE_WLEFT
            [0,0] # PIMAGE_CLIMBING
            ]
 
@@ -200,14 +243,12 @@ isShooting = False
 
 
 # Posicion
-#playerX = 520 # Posicion inicial X
-#playerY = 420 # Posuicion inicial Y
 playerPosition = [3., 23.]
 
 
 
 # Tamano
-playerHeight = 1
+playerHeight = 2
 playerWidth = 1
 
 
@@ -230,54 +271,88 @@ jumpSpeed = 3.5
 ### ---------- Propiedades los Monstruos ----------
 # Para anadir un monstruo simplemente se anade un valor extra a cada arreglo a gusto de consumidor XD
 
-# Valores iniciales
-mPosX = [24., 35.5]
-mPosY = [7., 20.]
+RESPAWNTIME = 4.000000
+respawnArray = []
 
-# Imagen que contiene todas las imagenes de los monstruos
-monstersGridName = ["grid.png", "grid.png"]
 
-# Tamano del grid (ancho, alto)
-mGridSizeX = [2, 2]
-mGridSizeY = [2, 2]
+# Array de direcciones de imagenes
+allMonstersImagesPath = [ "../res/textures/game/monsters/walking/right/", # MIMAGE_WRIGHT  Solamente la direccion, usaremos FOR
+                        "../res/textures/game/monsters/walking/left/", # MIMAGE_WLEFT    para sacar el nombre de las imagenes
+                        "../res/textures/game/monsters/climbing/" # MIMAGE_CLIMBING
+                        ]
 
-# Aqui se guardaran las imagenes leidas de cada monstruo (es usado al pintar)
-# La primera corresponde a 0,0, la segunda 1,0, la tercera 2,0... n,0 ... 0,1 , 0,2 , ..., 0,m ... n,m
-mImages = [[], []] 
 
-# Nombres
-mNames = ["Lentico"] # "CuboRojo", "CuboAzul"
+# Imagenes del jugador, crearemos solamente los array en blanco con el numero de imagenes que son
+mImages = [[0,0,0,0], # MIMAGE_WRIGHT   Inicializamos con la cantidad de imagenes
+           [0,0,0,0], # MIMAGE_WLEFT
+           #[0,0] # MIMAGE_CLIMBING
+           ]
+
+
+# Nombres (sera usado para saber la cantidad de monstruos y seran anadidos mediante el archivo del mapa)
+mNames = []
+
+# ID de todos los monstruos presentes en el nivel (usado para cargar los monstruos)
+monstersInLevel = []
 
 # Colores (Provisional)
 mColors = ["red", "blue"]
 
-# Restricciones
-mCanClimb = [False, False]
-mCanWalk = [True, True]
-
-
-# Estados
-mIsClimbing = [False, False]
-mIsWalking = [False, False]
-
-
 # Posicion
-mX = [6, 35.5] # Posicion inicial X
-mY = [21, 20] # Posuicion inicial Y
-
+mX = [] # Posicion X
+mY = [] # Posuicion Y
 
 
 # Tamano
-mHeight = [1, 1]
-mWidth = [1, 1]
-
+mHeight = []
+mWidth = []
 
 
 # Movimiento
-mSpeedX = [0.01, 0.05]
-mSpeedY = [0.01, 0.01]
+mSpeedX = []
+mSpeedY = []
 
 
+# Monster ID
+MONSTER_EGG = 0
+MONSTER_SAUSAGE = 1
+MONSTER_GHERKIN = 2
+
+# Velocidades de cada monstruo
+MONSTER_EGG_SPEED = [0.05, 0.05]
+MONSTER_SAUSAGE_SPEED = [0.05, 0.05]
+MONSTER_GHERKIN_SPEED = [0.05, 0.05]
+
+# Tamanos de cada monstruo
+MONSTER_EGG_SIZE = [1, 1]
+MONSTER_SAUSAGE_SIZE = [1, 2]
+MONSTER_GHERKIN_SIZE = [1, 2]
+
+# Nro de imagenes
+MONSTER_EGG_NUMBEROFIMAGES_WALKING = 3
+MONSTER_EGG_NUMBEROFIMAGES_CLIMBING = 2
+MONSTER_SAUSAGE_NUMBEROFIMAGES_WALKING = 4
+MONSTER_SAUSAGE_NUMBEROFIMAGES_CLIMBING = 2
+MONSTER_GHERKIN_NUMBEROFIMAGES_WALKING = 4
+MONSTER_GHERKIN_NUMBEROFIMAGES_CLIMBING = 2
+
+## --------- Imagenes de cada monstruo
+# Arreglo de las direcciones de cada imagen de cada monstruo en orden d elos monster ID
+allMonstersFolderPath = ["../res/textures/game/monsters/egg/",
+                         "../res/textures/game/monsters/gherkin/",
+                         "../res/textures/game/monsters/sausage/"]
+
+# Constantes de las imagenes
+MIMAGE_WRIGHT = 0
+MIMAGE_WLEFT = 1
+MIMAGE_CLIMBING = 2
+
+
+# Imagen que estamos pintando actualmente
+monstersActualImageToDraw = [] #(MIMAGE_WRIGHT, 0) # (id, nroImagen)
+
+# Todos los estados de los monstruos
+allMonstersStates = ["walking"]
 
 # ============================== Funciones y procedimientos ==============================       
 
@@ -300,7 +375,31 @@ def loadGameObjects():
             auxpImages[i].append(newImage)
     
     pImages = auxpImages;
-
+        
+    # Hamburguesa
+    global breadImages, lettuceImages, meatImages
+    # Pan
+    breadImages.append(pygame.image.load(BREAD_PATH + "left.png"))
+    breadImages.append(pygame.image.load(BREAD_PATH + "center.png"))
+    breadImages.append(pygame.image.load(BREAD_PATH + "right.png"))
+    
+    # Lechuga
+    lettuceImages.append(pygame.image.load(LETTUCE_PATH + "left.png"))
+    lettuceImages.append(pygame.image.load(LETTUCE_PATH + "center.png"))
+    lettuceImages.append(pygame.image.load(LETTUCE_PATH + "right.png"))
+    
+    # Carne
+    meatImages.append(pygame.image.load(MEAT_PATH + "left.png"))
+    meatImages.append(pygame.image.load(MEAT_PATH + "center.png"))
+    meatImages.append(pygame.image.load(MEAT_PATH + "right.png"))
+    
+    
+    # Mapa
+    global mapFloorImage, mapStairsImage
+    mapFloorImage = pygame.image.load(MAP_FILES_PATH + "floor.png")
+    mapStairsImage = pygame.image.load(MAP_FILES_PATH + "stairs.png")
+    
+    
     
 # Metodo para "soltar" las teclas del teclado
 def releaseKeys():
@@ -308,6 +407,12 @@ def releaseKeys():
     
     movementVector = [0,0]
     isWalking = False
+    
+    
+# Metodo para anadir puntuacion
+def addScore(amount):
+    global SCORE
+    SCORE += amount
 
 
 # =====================================================================================
@@ -353,7 +458,7 @@ def loadImage(filePath):
 
 # Metodo para cargar el mapa de una imagen (pixel a pixel)
 def loadMap(filePath):
-    global breadPositions, meatPositions, lettucePositions
+    global breadPositions, meatPositions, lettucePositions, monstersInLevel
     # Renombramos la ruta a la carpeta de mapas
     filePath = "../res/maps/" + filePath
     
@@ -456,6 +561,12 @@ def loadMap(filePath):
                 lettucePositions[cLettuce].append((x, y))
                 lettuceTimers[cLettuce].append(0) 
             else:
+                if rgb == COLOR_EGG:
+                    monstersInLevel.append(MONSTER_EGG)
+                elif rgb == COLOR_SAUSAGE:
+                    monstersInLevel.append(MONSTER_SAUSAGE)
+                elif rgb == COLOR_GHERKIN:
+                    monstersInLevel.append(MONSTER_GHERKIN)
                 sameObject = False
                 mapReaded.append(TILE_NULL)
             
@@ -634,7 +745,43 @@ def getMovementVector(p, ex, ey):
         mVector[0] = -1
     
     return mVector
+
+
+def getImageArray(id, path, n):
+    imageArray = []
+    for i in range(0, n):
+        imageArray.append(pygame.image.load())
+        
+
+
+# Metodo para agregar un monstruo
+def addMonster(id):
+    global mNames, mX, mY, mHeight, mWidth, mSpeedX, mSpeedY, monstersActualImageToDraw, mImages
+    if id == MONSTER_EGG:
+        mNames.append("Huevo")
+        mSpeedX.append(MONSTER_EGG_SPEED[0])
+        mSpeedY.append(MONSTER_EGG_SPEED[1])
+        mWidth.append(MONSTER_EGG_SIZE[0])
+        mHeight.append(MONSTER_EGG_SIZE[1])
+    elif id == MONSTER_SAUSAGE:
+        mNames.append("Salchicha")
+    elif id == MONSTER_GHERKIN:
+        mNames.append("Pepinillo")
+        
+    mX.append(0)
+    mY.append(0)
+    maitd = (MIMAGE_WRIGHT, 0)
+    monstersActualImageToDraw.append(maitd)
     
+    newMonster = []
+    for state in range(0, len(allMonstersStates)):
+        if allMonstersStates[state] == "walking":
+            rightWalk = []
+            leftWalk = []
+            rightWalk.append(pygame.image.load())
+            newMonster.append()
+    mImages.append([])
+ 
     
 
 # Metodo para obtener posiciones random en todos las entidades del juego
@@ -655,15 +802,45 @@ def initActors():
     r = getRandomMapPosition()
     playerPosition = [convertToMapX(r), convertToMapY(r)]    
     
+    # Cargamos los monstruos
+    global respawnArray, mImages 
+    
+    # Carga de imagenes
+    for n in range(0, len(monstersInLevel)):
+        mid = monstersInLevel[n]
+        addMonster(mid)
+        # Anadimos un arreglo de estado por cada estado que haya
+        for state in range(0, len(allMonstersStates)):
+            if allMonstersStates[state] == "walking":
+                mImages[]
+        
+        
+        
+        
+        
+    
+    # Inicializamos todos los arreglos segun la cantidad de monstruos (nombres)
+    for m in range(0, len(mNames)):
+        respawnArray.append(0)
+        mX.append(0)
+        mY.append(0)   
+    
+    
+    
+    
+    
+    
+    
+    
     # Inicializamos en vacio las posiciones de los monstruos
-    mX = []
-    mY = []
+    #mX = []
+    #mY = []
     
     # Le asignamos una posicion random a cada monstruo
-    for m in range(0, len(mNames)):
-        r = getRandomMapPosition()
-        mX.append(convertToMapX(r))
-        mY.append(convertToMapY(r))
+    #for m in range(0, len(mNames)):
+    #    r = getRandomMapPosition()
+    #    mX.append(convertToMapX(r))
+    #    mY.append(convertToMapY(r))
 
 
 # =====================================================================================
@@ -731,18 +908,21 @@ def drawMap():
                 continue
             
             # Variable para la textura actual
-            actColor = None
+            actImage = None
+            
+            # Como se pinta desde la esquina superior izq, las escaleras van a aparecer pintadas
+            # Un cuadro mas arriba, por lo que debemos bajarlas si es que vamos a pintar una
+            stairsOffset = 0 
             
             # Setteamos el color segun el numero en la matriz
             if actCoord == TILE_FLOOR:
-                actColor = "blue"
+                actImage = mapFloorImage
             elif actCoord == TILE_STAIRS:
-                actColor = "red"
-            else:
-                actColor = "black"
+                actImage = mapStairsImage
+                stairsOffset = TILE_SIZE
             
             # Pintamos el bloque
-            drawRect(xOffset, yOffset, TILE_SIZE, TILE_SIZE, getColor(actColor))
+            drawImageR(actImage, xOffset, yOffset + stairsOffset, TILE_SIZE, TILE_SIZE)
             
             # Actualizamos los offset
             xOffset += TILE_SIZE # Podriamos tener 1 solo offset ya que son iguales
@@ -775,7 +955,7 @@ def getNumberOfEntitiesOn(ingredient):
             if ix == math.floor(mX[m]) and iy == math.floor(mY[m]):
                 total += 1
         
-    print("Va a bajar ", total)
+    #print("Va a bajar ", total)
     return total
     
     
@@ -803,7 +983,7 @@ def moveDown(ingredient, numberOfFloors):
         # Porque de ser asi, estoy bajando de la ultima plataforma hacia abajo
         if y + nextY > mapHeight-12:
             break
-
+        
     return y+nextY
 
 # Metodo para resetear el timer de un ingrediente
@@ -828,6 +1008,8 @@ def checkCollision(ingredient, numberOfFloors):
         px, py = breadPositions[p][0]
         if ix == px and math.floor(iy+1) == py:
             breadDestination[p] = moveDown(breadPositions[p], numberOfFloors)
+            addScore(500 + int(breadDestination[p] / 10) * 200)
+            
     
     # Chequeamos colision en las lechugas
     for l in range(0, len(lettucePositions)):
@@ -836,6 +1018,7 @@ def checkCollision(ingredient, numberOfFloors):
         lx, ly = lettucePositions[l][0]
         if ix == lx and math.floor(iy+1) == ly:
             lettuceDestination[l] = moveDown(lettucePositions[l], numberOfFloors)
+            addScore(500 + int(lettuceDestination[l] / 10) * 200)
     
     # Chequeamos colision en las carnes
     for c in range(0, len(meatPositions)):
@@ -844,6 +1027,7 @@ def checkCollision(ingredient, numberOfFloors):
         cx, cy = meatPositions[c][0]
         if ix == cx and math.floor(iy+1) == cy:
             meatDestination[c] = moveDown(meatPositions[c], numberOfFloors)
+            addScore(500 + int(meatDestination[c] / 10) * 200)
         
         
     
@@ -966,6 +1150,7 @@ def tickHamburguers():
                 
                 
     # Luego vemos si algun ingrediente ya fue todo pisado para bajarlo
+    
     # Revisamos los panes
     for p in range(0, len(breadTimers)):
         # Creamos una variable para ver cuantos items del objeto actual
@@ -981,6 +1166,7 @@ def tickHamburguers():
             breadFloors = getNumberOfEntitiesOn(breadPositions[p])
             breadDestination[p] = moveDown(breadPositions[p], breadFloors)
             breadTimers[p] = resetTimer(breadTimers[p])
+            addScore(breadFloors * 200 + int(breadDestination[p] / 10) * 300)
             
             
     # Revisamos las lechugas
@@ -998,6 +1184,7 @@ def tickHamburguers():
             lettuceFloors = getNumberOfEntitiesOn(lettucePositions[l])
             lettuceDestination[l] = moveDown(lettucePositions[l], lettuceFloors)
             lettuceTimers[l] = resetTimer(lettuceTimers[l])
+            addScore(lettuceFloors * 200 + int(lettuceDestination[l] / 10) * 300)
             
             
     # Revisamos las carnes
@@ -1015,6 +1202,7 @@ def tickHamburguers():
             meatFloors = getNumberOfEntitiesOn(meatPositions[c])
             meatDestination[c] = moveDown(meatPositions[c], meatFloors)
             meatTimers[c] = resetTimer(meatTimers[c])
+            addScore(meatFloors * 200 + int(meatDestination[c] / 10) * 300)
     
     tickIngredients()
     
@@ -1031,7 +1219,19 @@ def renderHamburguers():
             offset = 0
             if breadTimers[p][i] != 0:
                 offset = offsetWhenWalked
-            drawRect(x, y + offset, TILE_SIZE, TILE_SIZE, getColor("bread"))
+            
+            # Pintamos la textura izquierda si i = 0
+            # Si i = len-1 pintamos la textura derecha
+            # Sino la textura central
+            textureToUse = 0
+            if i == 0:
+                textureToUse = 0
+            elif i == len(breadPositions[p]) - 1:
+                textureToUse = 2
+            else:
+                textureToUse = 1
+            drawImageR(breadImages[textureToUse], x, y + offset, TILE_SIZE, TILE_SIZE)
+
     
     # Pintamos las lechugas
     # Recorremos todas las lechugas
@@ -1043,7 +1243,19 @@ def renderHamburguers():
             offset = 0
             if lettuceTimers[l][i] != 0:
                 offset = offsetWhenWalked
-            drawRect(x, y + offset, TILE_SIZE, TILE_SIZE, getColor("lettuce"))
+                
+            # Pintamos la textura izquierda si i = 0
+            # Si i = len-1 pintamos la textura derecha
+            # Sino la textura central
+            textureToUse = 0
+            if i == 0:
+                textureToUse = 0
+            elif i == len(lettucePositions[l]) - 1:
+                textureToUse = 2
+            else:
+                textureToUse = 1
+            drawImageR(lettuceImages[textureToUse], x, y + offset, TILE_SIZE, TILE_SIZE)
+
 
     # Pintamos las carnes
     # Recorremos todas las carnes
@@ -1055,7 +1267,18 @@ def renderHamburguers():
             offset = 0
             if meatTimers[c][i] != 0:
                 offset = offsetWhenWalked
-            drawRect(x, y + offset, TILE_SIZE, TILE_SIZE, getColor("meat"))
+            
+            # Pintamos la textura izquierda si i = 0
+            # Si i = len-1 pintamos la textura derecha
+            # Sino la textura central
+            textureToUse = 0
+            if i == 0:
+                textureToUse = 0
+            elif i == len(meatPositions[c]) - 1:
+                textureToUse = 2
+            else:
+                textureToUse = 1
+            drawImageR(meatImages[textureToUse], x, y + offset, TILE_SIZE, TILE_SIZE)
 
 
 
@@ -1173,8 +1396,10 @@ def tickPlayer():
 # Metodo para pintar el HUD del jugador
 def renderHUD():
     drawString(1, 1, "Vidas: " + str(playerLifes), "Consolas", getColor("white"), 32)  
-    drawString(20, 1, "x = " + str(playerPosition[0]), "Consolas", getColor("white"), 28)
-    drawString(20, 2, "y = " + str(playerPosition[1]), "Consolas", getColor("white"), 28)
+    drawString(30, 1, "Score: " + str(SCORE), "Consolas", getColor("white"), 28)
+    drawString(mapWidth/2.0 - 1.0, 0.5, "Nivel " + str(actualLevel), "Tahoma", getColor("white"), 20)
+    #drawString(20, 1, "x = " + str(playerPosition[0]), "Consolas", getColor("white"), 28)
+    #drawString(20, 2, "y = " + str(playerPosition[1]), "Consolas", getColor("white"), 28)
     
   
     
@@ -1261,14 +1486,14 @@ def renderPlayer():
     setPlayerActualTexture()
     
     # Pintamos el rectangulo de area del jugador
-    drawRect(playerPosition[0], playerPosition[1] + jumpOffset, playerWidth, playerHeight, ((193 << 16) | (193 << 8) | 193))
+    #drawRect(playerPosition[0], playerPosition[1] + jumpOffset, playerWidth, playerHeight, ((193 << 16) | (193 << 8) | 193))
     
     # Finalmente, pintamos
     status, imgId = actualImageToDraw
-    drawImageR(pImages[status][imgId], playerPosition[0], playerPosition[1] + jumpOffset, playerWidth, playerHeight)
+    drawImageR(pImages[status][imgId], playerPosition[0] - playerWidth/2, playerPosition[1] + jumpOffset - 1, playerWidth, playerHeight)
     
     # Centro del jugador (Provisional)
-    drawRect(playerPosition[0], playerPosition[1], 0.3, 0.3, getColor("green"))
+    #drawRect(playerPosition[0], playerPosition[1], 0.3, 0.3, getColor("green"))
         
     # Pintamos el HUD del jugador
     renderHUD()
@@ -1341,6 +1566,38 @@ def inputPlayer(e):
 # =====================================================================================
 # =====================================================================================
 
+# Metodo para ver si la pimienta lanzada colisiona con algun monstruo
+def monstersCheckCollision():
+    global respawnArray, mX, mY
+    
+    if isShooting:
+        for m in range(0, len(mNames)):
+            #print("Pepper X = ", pepperPos[0])
+            #print("mx = ", mX[m])
+            if ((pepperPos[0] + pepperSize/2.0 >= mX[m]) 
+                and (pepperPos[0] + pepperSize/2.0 <= mX[m] + mWidth[m])
+                and (pepperPos[1] + pepperSize/2.0 >= mY[m])
+                and (pepperPos[1] + pepperSize/2.0 <= mY[m] + mHeight[m])):
+                # Si entra aqui, la pimienta le pego
+                addScore(350)
+                respawnArray[m] = time.time()
+                r = getRandomMapPosition()
+                mX[m] = convertToMapX(r)
+                mY[m] = convertToMapY(r)
+                
+                
+
+
+# Metodo para hacer que reaparezcan los monstruos
+def respawnMonsters():
+    global respawnArray
+    
+    for m in range(0, len(mNames)):
+        if respawnArray[m] != 0:
+            if time.time() - respawnArray[m] > RESPAWNTIME:
+                respawnArray[m] = 0
+
+
 # Metodo para arreglar la posicion del monstruo al subir
 def getYFixed(mx, my, mHeight):
     mx = math.floor(mx)
@@ -1354,8 +1611,14 @@ def getYFixed(mx, my, mHeight):
 def tickMonsters():
     global isAlive
     
+    respawnMonsters()
+    
     # Recorremos todos los monstruos
     for i in range(0, len(mNames)):
+        # Si el monstruo no esta visible no queremos hacer nada.. asi que chequeamos
+        if respawnArray[i] != 0:
+            continue
+        
         # Obtenemos la posicion del jugador respecto al mapa
         playerPos = (math.floor(playerPosition[0]), math.floor(playerPosition[1]))
 
@@ -1379,6 +1642,8 @@ def tickMonsters():
             mX[i] += mSpeedX[i] * mVector[0]
         elif mVector[1] != 0:
             mY[i] += mSpeedY[i] * mVector[1] # Calculamos primero la nueva Y antes de asignarla para evitar bug
+            
+    monstersCheckCollision()
 
 
 
@@ -1386,11 +1651,9 @@ def tickMonsters():
 def renderMonsters():    
     # Pintamos todos los monstruos
     for i in range(0, len(mNames)):
-        drawRect(mX[i], mY[i], mWidth[i], mHeight[i], getColor("green"))
-        #drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "Consolas", getColor("white"), 12)
-        
-        
-        
+        if respawnArray[i] == 0:
+            drawRect(mX[i], mY[i], mWidth[i], mHeight[i], getColor("green"))
+            #drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "Consolas", getColor("white"), 12)   
         
 
 
@@ -1399,6 +1662,48 @@ def renderMonsters():
 # ================================= Menu del Juego ====================================
 # =====================================================================================
 # =====================================================================================
+
+# Metodo para cargar un nivel
+def loadLevel(level):
+    global map    
+    map = loadMap("level" + str(level) + ".png")
+
+
+    
+# Metodo para pintar el menu de seleccion de nivel
+def renderLevelSelection():
+    coordRect = 18.0
+    drawString(3, 10, "Introduzca el numero del nivel que desea jugar", "Consolas", getColor("white"), 28)
+    drawRect(coordRect, 12, 4, 4, getColor("white"))
+    drawString(coordRect + 1.2, 13, str(levelSelected), "Consolas", getColor("black"), 52)
+    
+# Metodo para activar el teclado en la seleccion de nivel
+def inputLevelSelection(e):
+    global enterPressed, isPlaying, isSelectingLevel, levelSelected, actualLevel
+    
+    if e == KEY_1 or e == KEY_NUMPAD1:
+        levelSelected = 1
+    elif e == KEY_2 or e == KEY_NUMPAD2:
+        levelSelected = 2
+    elif e == KEY_3 or e == KEY_NUMPAD3:
+        levelSelected = 3
+    elif e == KEY_4 or e == KEY_NUMPAD4:
+        levelSelected = 4
+    elif e == KEY_5 or e == KEY_NUMPAD5:
+        levelSelected = 5
+    elif e == KEY_6 or e == KEY_NUMPAD6:
+        levelSelected = 6
+    elif e == KEY_7 or e == KEY_NUMPAD7:
+        levelSelected = 7
+    elif e == KEY_8 or e == KEY_NUMPAD8:
+        levelSelected = 8
+        
+    if e == KEY_ENTER:
+        isSelectingLevel = False
+        actualLevel = levelSelected
+        loadLevel(levelSelected)
+        isPlaying = True
+        initActors()
 
 
 # Metodo para actualizar el menu
@@ -1423,7 +1728,7 @@ def renderMenu():
     
 # Metodo para activar el teclado en modo Menu
 def inputMenu(e):
-    global selectedOptionY, selectedOption, enterPressed, isInMenu, isPlaying
+    global selectedOptionY, selectedOption, enterPressed, isInMenu, isPlaying, isSelectingLevel
 
     # Movemos el cursor del menu segun sea la tecla
     if (e == KEY_DOWN or e == KEY_S or e == KEY_s) and (selectedOption > 1):
@@ -1437,8 +1742,8 @@ def inputMenu(e):
     if e == KEY_ENTER:
         if selectedOption == MENU_PLAY:
             isInMenu = False
-            isPlaying = True
-            initActors()
+            isSelectingLevel = True
+            #initActors()
         elif selectedOption == MENU_EXIT:
             sys.exit()
     
@@ -1451,6 +1756,17 @@ def inputMenu(e):
 # ============================== Metodos del Juego ====================================
 # =====================================================================================
 # =====================================================================================
+
+# Metodo para ver si se completo el nivel
+def tickLevel():    
+    for p in range(0, len(breadPositions)):
+        x, y = breadPositions[p][0]
+        
+        if y < INGREDIENTS_FLOOR:
+            return
+    
+    # Si llega aqui es porque terminamos el nivel
+    drawString(mapWidth/2, mapHeight/3, "TERMINO", "Consolas", getColor("white"), 100) 
 
 
 # Pintar todo lo referente al juego (cuando se esta jugando)
@@ -1474,6 +1790,7 @@ def renderGame():
     
 # Actualizar el juego (cuando se esta jugando)
 def tickGame():
+    tickLevel()
     # Actualizamos solo si el juego no esta pausado
     if not isPaused:
         tickMonsters()
@@ -1494,6 +1811,8 @@ def tick():
 def input(e):    
     if isInMenu:
         inputMenu(e)
+    elif isSelectingLevel:
+        inputLevelSelection(e)
     else:
         inputPlayer(e)       
         
@@ -1510,6 +1829,8 @@ def render():
     
     if isInMenu:
         renderMenu()
+    elif isSelectingLevel:
+        renderLevelSelection()
     elif isPlaying:
         renderGame()
 
@@ -1527,6 +1848,11 @@ def mainLoop():
     
     # Setteamos el titulo
     pygame.display.set_caption(windowTitle)
+    
+    # Setteamos el icono
+    icon = pygame.image.load("../res/icon.png").convert_alpha()
+    pygame.display.set_icon(icon)
+    
     
     # Setteamos nuestro reloj para manejar el tiempo
     pygameClock = pygame.time.Clock()
@@ -1575,9 +1901,6 @@ def mainLoop():
 # =============================== COMENZAR EL JUEGO ===================================
 # =====================================================================================
 # =====================================================================================
-
-# Leemos el mapa del archivo
-map = loadMap("level1.png")    
 
 loadGameObjects()
 
