@@ -4,37 +4,41 @@ import math
 import time
 import pygame
 import random
+import pymssql
 from pygame.locals import *
 
 import PIL.Image
 
 # ============================== Variables ==============================
 
+# Constantes Juego
+TOTALLEVELS = 2
+
 # Constantes MENU
-MENU_PLAY = 2
+MENU_PLAY = 3
+MENU_SELECTUSER = 2
 MENU_EXIT = 1
-MAX_OPTIONS = 2
+MAX_OPTIONS = 3
 
 # Propiedades del menu
 # Para crear una opcion nueva es igual que los monstruos, se anade 1 item a cada arreglo de opciones
 # se modifica arriba MAX_OPTIONS, y se anade la opcion nueva
 
-selectedOption = 2              # Opcion seleccionada por defecto
+selectedOption = 3              # Opcion seleccionada por defecto
 selectedOptionY = 200           # Coordenada Y del cursor en el menu
 selectedOptionX  = 260          # Coordenada X del cursor del menu
 selectedOptionWidth = 50        # Ancho del cursor del menu
 selectedOptionHeight = 50       # Alto del cursor del menu
 distanceBetweenOptions = 100    # Distancia entre cada opcion del menu (para mover el triangulo)
 
-optionNames = ["Salir", "Jugar"]
-optionXCoords = [17, 17]
-optionYCoords = [15.5, 10.5]
+optionNames = ["Salir", "Seleccionar Usuario", "Jugar"]
+optionXCoords = [17, 10, 17]
+optionYCoords = [20.5, 15.5, 10.5]
 
 
 # Estados del juego
 isInMenu = True
-isCreatingNewProfile = False
-isSelectingProfile = False
+isInUserMenu = False
 isPlaying = False
 isPaused = False
 isRunning = True
@@ -63,6 +67,7 @@ KEY_W = 87
 KEY_P = 80
 KEY_ENTER = 13
 KEY_SPACE = 32
+KEY_BACKSPACE = 8
 
 KEY_1 = 49
 KEY_2 = 50
@@ -87,6 +92,7 @@ KEY_NUMPAD9 = 265
 # Colores constantes
 COLOR_FLOOR = 0xFF00FF
 COLOR_STAIRS = 0x00FF00
+
 COLOR_MEAT = 0x975016
 COLOR_BREAD = 0xFF9D00
 COLOR_LETTUCE = 0x62D551
@@ -152,11 +158,12 @@ WALKABLE_TILES = [1,2,6,7,8]
 
 
 # Propiedades de la pimienta
+pepperImg = pygame.image.load("../res/textures/game/items/pepper.png")
 pepperPos = [0, 0]
 pepperTime = 0
-pepperSize = 0.4
+pepperSize = 1
 pepperLastDir = 0
-PEPPER_SPEED = 0.08
+PEPPER_SPEED = 0.20
 
 
 ### ---------- Propiedades de la/s hamburguesas ------------
@@ -278,15 +285,26 @@ respawnArray = []
 # Array de direcciones de imagenes
 allMonstersImagesPath = [ "../res/textures/game/monsters/walking/right/", # MIMAGE_WRIGHT  Solamente la direccion, usaremos FOR
                         "../res/textures/game/monsters/walking/left/", # MIMAGE_WLEFT    para sacar el nombre de las imagenes
-                        "../res/textures/game/monsters/climbing/" # MIMAGE_CLIMBING
+                        #"../res/textures/game/monsters/climbing/" # MIMAGE_CLIMBING
                         ]
 
+# Todas las imagenes del huevo
+eggImages = [[0,0,0], # WALKING LEFT
+             [0,0,0]  # WALKING RIGHT
+             ]
 
-# Imagenes del jugador, crearemos solamente los array en blanco con el numero de imagenes que son
-mImages = [[0,0,0,0], # MIMAGE_WRIGHT   Inicializamos con la cantidad de imagenes
-           [0,0,0,0], # MIMAGE_WLEFT
-           #[0,0] # MIMAGE_CLIMBING
-           ]
+# Todas las imagenes de la salchicha
+sausageImages = [[0,0,0,0], # WALKING LEFT
+                 [0,0,0,0]  # WALKING RIGHT
+                 ]
+
+# Todas las imagenes del pepinillo
+gherkinImages = [[0,0,0,0], # WALKING LEFT
+                 [0,0,0,0]  # WALKING RIGHT
+                 ]
+
+# Todos los monstruos con todas sus imagenes
+allMonstersImages = [eggImages, sausageImages, gherkinImages]
 
 
 # Nombres (sera usado para saber la cantidad de monstruos y seran anadidos mediante el archivo del mapa)
@@ -325,8 +343,8 @@ MONSTER_GHERKIN_SPEED = [0.05, 0.05]
 
 # Tamanos de cada monstruo
 MONSTER_EGG_SIZE = [1, 1]
-MONSTER_SAUSAGE_SIZE = [1, 2]
-MONSTER_GHERKIN_SIZE = [1, 2]
+MONSTER_SAUSAGE_SIZE = [1, 1]
+MONSTER_GHERKIN_SIZE = [1, 1]
 
 # Nro de imagenes
 MONSTER_EGG_NUMBEROFIMAGES_WALKING = 3
@@ -338,9 +356,16 @@ MONSTER_GHERKIN_NUMBEROFIMAGES_CLIMBING = 2
 
 ## --------- Imagenes de cada monstruo
 # Arreglo de las direcciones de cada imagen de cada monstruo en orden d elos monster ID
-allMonstersFolderPath = ["../res/textures/game/monsters/egg/",
-                         "../res/textures/game/monsters/gherkin/",
-                         "../res/textures/game/monsters/sausage/"]
+allMonstersFolderPath = [ # Huevo
+                         ["../res/textures/game/monsters/egg/walking/left/",
+                            "../res/textures/game/monsters/egg/walking/right/"],
+                         # Salchicha
+                         ["../res/textures/game/monsters/sausage/walking/left/",
+                            "../res/textures/game/monsters/sausage/walking/right/"],
+                         # Pepinillo
+                         ["../res/textures/game/monsters/gherkin/walking/left/",
+                            "../res/textures/game/monsters/gherkin/walking/right/"]
+                        ]                         
 
 # Constantes de las imagenes
 MIMAGE_WRIGHT = 0
@@ -354,12 +379,58 @@ monstersActualImageToDraw = [] #(MIMAGE_WRIGHT, 0) # (id, nroImagen)
 # Todos los estados de los monstruos
 allMonstersStates = ["walking"]
 
+
+
+### ----------------- Usuarios -----------------
+# Variable para mantener un arreglo de usuarios
+# Contendra un arreglo por cada usuario, donde cada campo sera:
+# [Nick, Clave, Nombre, Apellido, Email, Telefono]; respectivamente... y un arreglo de puntuaciones
+users = []
+
+# Estados
+isCreatingNewProfile = False
+isSelectingProfile = False
+creatingNewProfileStates = [False, False, False, False, False, False]
+selectingProfileStates = [False, False]
+
+# Constantes
+USER_NICK = 0
+USER_PASSWORD = 1
+USER_NAME = 2
+USER_LASTNAME = 3
+USER_EMAIL = 4
+USER_PHONE = 5
+
+USERMENU_CREATE = 1
+USERMENU_SELECT = 2
+USERMENU_BACK = 3
+USERMENU_MAXOPTIONS = 3
+
+# Usuario seleccionado para jugar
+userSelected = [["No Seleccionado", "No Seleccionado", "No Seleccionado", "No Seleccionado", "No Seleccionado", "No Seleccionado"], []]
+userSelectedId = 0
+
+# Cosas para el menu
+userMenuOptions = ["Crear Usuario", "Seleccionar Usuario", "Volver atras"]
+userMenuSelectedOption = 1
+userMenuY = [10.5, 15.5, 20.5]
+userMenuX = [12,9,13]
+strWritten = ""
+userWritten = ["", ""]
+newUserWritten = [["", "", "", "", "", ""], []]
+
+infoMessage = ""
+infoMessageTimer = 0
+TIMER_INFOMESSAGE = 3
+
+
+
 # ============================== Funciones y procedimientos ==============================       
 
 # Metodo para cargar todos los objetos y texturas del juego
 def loadGameObjects():
-    global pImages
     # Cargamos las imagenes del jugador
+    global pImages    
     # Creamos un nuevo array de imagenes auxiliar
     auxpImages = []
     
@@ -375,6 +446,29 @@ def loadGameObjects():
             auxpImages[i].append(newImage)
     
     pImages = auxpImages;
+    
+    # Imagenes de los monstruos
+    global eggImages, sausageImages, gherkinImages, allMonstersImages
+    # Creamos un nuevo array de imagenes auxiliar
+    auxmImages = []
+    
+    # Hacemos un for que recorra todos los monstruos disponibles
+    for m in range(0, len(allMonstersFolderPath)):
+        # Anadimos un nuevo monstruo
+        auxmImages.append([])
+        # Hacemos un for que recorra todas las carpetas de imagenes de cada monstruo
+        for c in range(0, len(allMonstersFolderPath[m])):
+            # Anadimos un nuevo set de imagenes para el monstruo actual
+            auxmImages[m].append([])
+            # Recorremos todas las imagenes en el directorio actual
+            for i in range(len(allMonstersImages[m][c])):
+                # Cargamos cada una de ellas
+                path = allMonstersFolderPath[m][c] + str(i) + ".png"
+                newImage = pygame.image.load(path)
+                auxmImages[m][c].append(newImage)
+    
+    allMonstersImages = auxmImages    
+    
         
     # Hamburguesa
     global breadImages, lettuceImages, meatImages
@@ -413,6 +507,89 @@ def releaseKeys():
 def addScore(amount):
     global SCORE
     SCORE += amount
+    
+# Metodo para resetear el mensaje de informacion
+def resetInfoMessage():
+    global infoMessage
+    if time.time() - infoMessageTimer > TIMER_INFOMESSAGE:
+        infoMessage = ""
+    
+
+# =====================================================================================
+# =====================================================================================
+# ============================== Archivos de Texto ====================================
+# =====================================================================================
+# =====================================================================================
+
+# Carga de usuarios a la memoria
+def loadUsers():
+    global users
+    # Abrimos el archivo
+    file = open("../res/data/db.txt", "r")
+    
+    # Leemos todas las lineas
+    lines = file.readlines()
+    
+    i = -1
+    k = 0 # 0 = info, 1 = scores
+    # Recorremos cada una de las lineas
+    for line in lines:
+        # Recortamos el enter del final..
+        if line[len(line)-1:] == "\n":
+            line = line[:len(line)-1]
+        
+        if line == "<newuser>":
+            users.append([])
+            i += 1
+            # Este es el arreglo de la informacion
+            users[i].append([])
+            k = 0
+        elif line == "<scores>":
+            # Arreglo de las puntuaciones
+            users[i].append([])
+            k = 1
+        else:
+            users[i][k].append(line)    
+            
+    
+    print(users)
+    # Cerramos el archivo
+    file.close()
+    
+
+# Chequear si existe un usuario
+def userExists(nick):
+    for user in users:
+        if user[0][USER_NICK] == nick:
+            return True
+    return False
+
+# Metodo para devolver un usuario
+def doLogin(user, password):
+    global userSelectedId
+    userSelectedId = -1
+    for u in users:
+        userSelectedId += 1
+        if u[0][0] == user and u[0][1] == password:
+            return u
+    
+    return ["Login Failed", "Login Failed", "Login Failed", "Login Failed", "Login Failed", "Login Failed"]
+
+
+# Metodo para reescribir el archivo
+def rewriteUsersFile():
+    # Abrimos el archivo
+    file = open("../res/data/db.txt", "w")
+    
+    for user in users:
+        file.write("<newuser>\n")        
+        for info in user[0]:
+            file.write(info + "\n")
+            
+        file.write("<scores>\n")
+        for score in user[1]:
+            file.write(str(score) + "\n")
+        
 
 
 # =====================================================================================
@@ -451,14 +628,67 @@ def getColor(name):
     elif name == "cyan":
         return (0, 255, 255)
     
+def getRandomColor():
+    r = random.randint(0, 9)
+    if r == 1:
+        return getColor("red")
+    elif r == 2:
+        return getColor("green")
+    elif r == 3:
+        return getColor("blue")
+    elif r == 4:
+        return getColor("white")
+    elif r == 5:
+        return getColor("pink")
+    elif r == 6:
+        return getColor("orange")
+    elif r == 7:
+        return getColor("bread")
+    elif r == 8:
+        return getColor("meat")
+    elif r == 9:
+        return getColor("lettuce")
+    elif r == 0:
+        return getColor("cyan")
+    
+    
+
 # Metodo para cargar una imagen
 def loadImage(filePath):
     return pygame.image.load(filePath)
 
 
+# Metodo para reiniciar todos los obj hamburguesas
+def resetHamburguerObjects():
+    global breadPositions, lettucePositions, meatPositions, breadTimers, lettuceTimers, meatTimers, breadDestination, lettuceDestination, meatDestination, breadFloors, lettuceFloors, meatFloors
+    
+    # Posiciones
+    breadPositions = []
+    lettucePositions = []
+    meatPositions = []
+    
+    # Temporizadores para controlar el pisado
+    breadTimers = []
+    lettuceTimers = []
+    meatTimers = []
+    
+    # Destinos (para ver si un ingrediente esta bajando..)
+    breadDestination = []
+    lettuceDestination = []
+    meatDestination = []
+    
+    breadFloors = []
+    lettuceFloors = []
+    meatFloors = []
+
+
 # Metodo para cargar el mapa de una imagen (pixel a pixel)
 def loadMap(filePath):
     global breadPositions, meatPositions, lettucePositions, monstersInLevel
+    
+    # Reinicializamos todos los objetos de hamburguesas
+    resetHamburguerObjects()
+    
     # Renombramos la ruta a la carpeta de mapas
     filePath = "../res/maps/" + filePath
     
@@ -744,19 +974,12 @@ def getMovementVector(p, ex, ey):
     elif ex > px:
         mVector[0] = -1
     
-    return mVector
-
-
-def getImageArray(id, path, n):
-    imageArray = []
-    for i in range(0, n):
-        imageArray.append(pygame.image.load())
-        
+    return mVector        
 
 
 # Metodo para agregar un monstruo
 def addMonster(id):
-    global mNames, mX, mY, mHeight, mWidth, mSpeedX, mSpeedY, monstersActualImageToDraw, mImages
+    global mNames, mX, mY, mHeight, mWidth, mSpeedX, mSpeedY, monstersActualImageToDraw, mImages, respawnArray
     if id == MONSTER_EGG:
         mNames.append("Huevo")
         mSpeedX.append(MONSTER_EGG_SPEED[0])
@@ -765,23 +988,24 @@ def addMonster(id):
         mHeight.append(MONSTER_EGG_SIZE[1])
     elif id == MONSTER_SAUSAGE:
         mNames.append("Salchicha")
+        mSpeedX.append(MONSTER_SAUSAGE_SPEED[0])
+        mSpeedY.append(MONSTER_SAUSAGE_SPEED[1])
+        mWidth.append(MONSTER_SAUSAGE_SIZE[0])
+        mHeight.append(MONSTER_SAUSAGE_SIZE[1])
     elif id == MONSTER_GHERKIN:
         mNames.append("Pepinillo")
+        mSpeedX.append(MONSTER_GHERKIN_SPEED[0])
+        mSpeedY.append(MONSTER_GHERKIN_SPEED[1])
+        mWidth.append(MONSTER_GHERKIN_SIZE[0])
+        mHeight.append(MONSTER_GHERKIN_SIZE[1])
         
-    mX.append(0)
-    mY.append(0)
+        
+    r = getRandomMapPosition()
+    mX.append(convertToMapX(r))
+    mY.append(convertToMapY(r))
+    respawnArray.append(0)
     maitd = (MIMAGE_WRIGHT, 0)
-    monstersActualImageToDraw.append(maitd)
-    
-    newMonster = []
-    for state in range(0, len(allMonstersStates)):
-        if allMonstersStates[state] == "walking":
-            rightWalk = []
-            leftWalk = []
-            rightWalk.append(pygame.image.load())
-            newMonster.append()
-    mImages.append([])
- 
+    monstersActualImageToDraw.append(maitd) 
     
 
 # Metodo para obtener posiciones random en todos las entidades del juego
@@ -798,49 +1022,26 @@ def initActors():
     isJumping = False
     isShooting = False
     
+    # Inicializamos todos los arreglos de los monstruos
+    global mNames, mX, mY, mHeight, mWidth, mSpeedX, mSpeedY, monstersActualImageToDraw, respawnArray
+    mNames = []
+    mX = []
+    mY = []
+    mHeight = []
+    mWidth = []
+    mSpeedX = []
+    mSpeedY = []
+    monstersActualImageToDraw = []
+    respawnArray = []
+    
     # Le asignamos una posicion random al jugador
     r = getRandomMapPosition()
     playerPosition = [convertToMapX(r), convertToMapY(r)]    
     
     # Cargamos los monstruos
-    global respawnArray, mImages 
-    
-    # Carga de imagenes
     for n in range(0, len(monstersInLevel)):
         mid = monstersInLevel[n]
-        addMonster(mid)
-        # Anadimos un arreglo de estado por cada estado que haya
-        for state in range(0, len(allMonstersStates)):
-            if allMonstersStates[state] == "walking":
-                mImages[]
-        
-        
-        
-        
-        
-    
-    # Inicializamos todos los arreglos segun la cantidad de monstruos (nombres)
-    for m in range(0, len(mNames)):
-        respawnArray.append(0)
-        mX.append(0)
-        mY.append(0)   
-    
-    
-    
-    
-    
-    
-    
-    
-    # Inicializamos en vacio las posiciones de los monstruos
-    #mX = []
-    #mY = []
-    
-    # Le asignamos una posicion random a cada monstruo
-    #for m in range(0, len(mNames)):
-    #    r = getRandomMapPosition()
-    #    mX.append(convertToMapX(r))
-    #    mY.append(convertToMapY(r))
+        addMonster(mid)        
 
 
 # =====================================================================================
@@ -1315,7 +1516,8 @@ def renderPepper():
         return
     
     # Pintamos la pimienta
-    drawRect(pepperPos[0], pepperPos[1] + cos, pepperSize, pepperSize, getColor("cyan"))
+    #drawRect(pepperPos[0], pepperPos[1] + cos, pepperSize, pepperSize, getColor("cyan"))
+    drawImageR(pepperImg, pepperPos[0], pepperPos[1] + cos, int(pepperSize), int(pepperSize))
     
     
 
@@ -1345,6 +1547,9 @@ def tickPlayer():
         isAlive = True
         playerLifes -= 1
         if playerLifes < 0:
+            users[userSelectedId][1].append(SCORE)
+            rewriteUsersFile()
+            print(users)
             isInMenu = True
             isPlaying = False
             playerLifes = 3
@@ -1607,14 +1812,52 @@ def getYFixed(mx, my, mHeight):
         return mHeight
     return 0
 
+# Setteamos la textura actual a pintar
+def setMonsterActualTexture(mDir, mAct):
+    global monstersActualImageToDraw
+    
+    # Obtenemos el status actual y el img id actual
+    actualStatus, actualImgId = monstersActualImageToDraw[mAct]
+    
+    if mDir == 1:
+        # Si el status es el mismo que el anterior, sumamos uno a la imagen
+        if actualStatus == MIMAGE_WLEFT:
+            actualImgId += 1
+            # Chequeamos no habernos pasado del limite de imgs
+            if actualImgId >= len(allMonstersImages[monstersInLevel[mAct]][actualStatus]):
+                actualImgId = 0
+        # Sino, setteamos el nuevo spritesheet desde 0
+        else:
+            actualImgId = 0
+            actualStatus = MIMAGE_WLEFT
+    else:
+        # Si el status es el mismo, sumamos
+        if actualStatus == MIMAGE_WRIGHT:
+            actualImgId += 1
+            # Chequeamos no pasarnos...
+            if actualImgId >= len(allMonstersImages[monstersInLevel[mAct]][actualStatus]):
+                actualImgId = 0
+        # Sino, setteamos desde 0
+        else:
+            actualImgId = 0
+            actualStatus = MIMAGE_WRIGHT
+            
+    monstersActualImageToDraw[mAct] = (actualStatus, actualImgId)
+    
+            
+    
+    
+    
+    
+
 # Metodo para que se muevan los monstruos
 def tickMonsters():
-    global isAlive
+    global isAlive, monstersActualImageToDraw
     
     respawnMonsters()
     
     # Recorremos todos los monstruos
-    for i in range(0, len(mNames)):
+    for i in range(0, len(monstersInLevel)):
         # Si el monstruo no esta visible no queremos hacer nada.. asi que chequeamos
         if respawnArray[i] != 0:
             continue
@@ -1636,12 +1879,19 @@ def tickMonsters():
             return
        
         # Obtenemos el vector de movimiento
-        mVector = getMovementVector(path, math.floor(mX[i]), math.floor(mY[i]))            
+        mVector = getMovementVector(path, math.floor(mX[i]), math.floor(mY[i])) 
+        
+        # Evitar que queden abajito al subir       
+        if mY[i] > math.floor(mY[i]) and mVector[0] != 0:
+            mY[i] = math.floor(mY[i])
+             
         # Lo sumamos        
         if mVector[0] != 0:
-            mX[i] += mSpeedX[i] * mVector[0]
+            mX[i] += mSpeedX[i] * mVector[0]            
         elif mVector[1] != 0:
             mY[i] += mSpeedY[i] * mVector[1] # Calculamos primero la nueva Y antes de asignarla para evitar bug
+        
+        setMonsterActualTexture(mVector[0], i)
             
     monstersCheckCollision()
 
@@ -1650,12 +1900,186 @@ def tickMonsters():
 # Metodo para pintar los monstruos
 def renderMonsters():    
     # Pintamos todos los monstruos
-    for i in range(0, len(mNames)):
+    for i in range(0, len(monstersInLevel)):
         if respawnArray[i] == 0:
-            drawRect(mX[i], mY[i], mWidth[i], mHeight[i], getColor("green"))
+            status, imgId = monstersActualImageToDraw[i]
+            drawImageR(allMonstersImages[monstersInLevel[i]][status][imgId], mX[i], mY[i], mWidth[i], mHeight[i])
+            #drawRect(mX[i], mY[i], mWidth[i], mHeight[i], getColor("green"))
             #drawString(mX[i]-(mWidth[i]/2.8), mY[i]-15, mNames[i], "Consolas", getColor("white"), 12)   
         
 
+# =====================================================================================
+# =====================================================================================
+# ============================ Menu Creacion usuario ==================================
+# =====================================================================================
+# =====================================================================================
+
+def inputSelectingUser(e):
+    global selectingProfileStates, strWritten, userSelected, userWritten, isSelectingProfile
+    
+    chr = e.unicode
+    key = e.key
+    
+    if key == KEY_BACKSPACE:
+        strWritten = strWritten[:len(strWritten)-1]
+    elif key == KEY_ENTER: 
+        for i in range(0, len(selectingProfileStates)):
+            if selectingProfileStates[i] == True:
+                selectingProfileStates[i] = False
+                userWritten[i] = strWritten
+                strWritten = ""
+                # Activo el siguiente estado si hay..
+                if i+1 < len(selectingProfileStates):
+                    selectingProfileStates[i+1] = True                    
+                    break
+                else:
+                    userSelected = doLogin(userWritten[0], userWritten[1])
+                    isSelectingProfile = False
+                
+    else:
+        strWritten += chr
+    
+def inputCreatingUser(e):
+    global creatingNewProfileStates, isCreatingNewProfile, strWritten, newUserWritten, infoMessage, infoMessageTimer
+    
+    chr = e.unicode
+    key = e.key
+    
+    if key == KEY_BACKSPACE:
+        strWritten = strWritten[:len(strWritten)-1]
+    elif key == KEY_ENTER:
+        for i in range(0, len(creatingNewProfileStates)):
+            if creatingNewProfileStates[i] == True:
+                creatingNewProfileStates[i] = False
+                newUserWritten[0][i] = strWritten
+                strWritten = ""
+                # Activo el sig estado si hay
+                if i+1 < len(creatingNewProfileStates):
+                    creatingNewProfileStates[i+1] = True
+                    break
+                else:
+                    # Chequeamos si el usuario no existe ya
+                    if not userExists(newUserWritten[0][0]):
+                        # Creamos el nuevo usuario en memoria
+                        users.append(newUserWritten)
+                        isCreatingNewProfile = False
+                        rewriteUsersFile()
+                        print(users)
+                    else: # Ya existe
+                        isCreatingNewProfile = False
+                        infoMessage = "El usuario ya existe"
+                        infoMessageTimer = time.time()
+    else:
+        strWritten += chr
+                    
+                
+                
+def inputUserMenu(e):
+    global userMenuSelectedOption, isInUserMenu, isInMenu, isCreatingNewProfile, isSelectingProfile, creatingNewProfileStates, selectingProfileStates
+
+    chr = e.unicode
+    key = e.key
+    
+    # Chequeo si estoy seleccionando o creando primero
+    if selectingProfileStates[0] or selectingProfileStates[1]:
+        inputSelectingUser(e)
+        return
+    elif (creatingNewProfileStates[0] or creatingNewProfileStates[1] or creatingNewProfileStates[2] or creatingNewProfileStates[3]
+          or creatingNewProfileStates[4] or creatingNewProfileStates[5]):
+        inputCreatingUser(e)
+        return
+    
+    if (key == KEY_UP or chr == "w" or chr == "W") and (userMenuSelectedOption > 1):
+        userMenuSelectedOption -= 1
+    elif (key == KEY_DOWN or chr == "s" or chr == "S") and (userMenuSelectedOption < USERMENU_MAXOPTIONS):
+        userMenuSelectedOption += 1
+        
+    if key == KEY_ENTER:
+        if userMenuSelectedOption == USERMENU_BACK:
+            isInMenu = True
+            isInUserMenu = False
+        elif userMenuSelectedOption == USERMENU_SELECT:
+            isSelectingProfile = True
+            selectingProfileStates[0] = True
+        elif userMenuSelectedOption == USERMENU_CREATE:
+            isCreatingNewProfile = True
+            creatingNewProfileStates[0] = True
+        
+    
+# El menu de seleccionar usuario
+def renderSelectingUser():
+    # Optimizar a un simple for...
+    
+    # Introduciendo usuario
+    if selectingProfileStates[0]:
+        drawString(10, 10, "Usuario", "Consolas", getColor("white"), 60)
+    # Introduciendo contrasena
+    elif selectingProfileStates[1]:
+        drawString(10, 10, "Clave", "Consolas", getColor("white"), 60)    
+    
+    drawRect(10, 15, 20, 2, getColor("white"))
+    drawString(11, 15.5, strWritten, "Consolas", getColor("black"), 24)
+    
+    
+    
+# El menu de creacion de usuario
+def renderCreatingUser():
+    # Optimizar a un simple for...
+    
+    # Introduciendo Nickname
+    if creatingNewProfileStates[0]:
+        drawString(10, 10, "Usuario", "Consolas", getColor("white"), 60)
+    # Introduciendo clave
+    elif creatingNewProfileStates[1]:
+        drawString(10, 10, "Clave", "Consolas", getColor("white"), 60)
+    # Introduciendo nombre
+    elif creatingNewProfileStates[2]:
+        drawString(10, 10, "Nombre", "Consolas", getColor("white"), 60)
+    # Introduciendo apellido
+    elif creatingNewProfileStates[3]:
+        drawString(10, 10, "Apellido", "Consolas", getColor("white"), 60)
+    # Introduciendo email
+    elif creatingNewProfileStates[4]:
+        drawString(10, 10, "Email", "Consolas", getColor("white"), 60)
+    # Introduciendo telefono
+    elif creatingNewProfileStates[5]:
+        drawString(10, 10, "Numero", "Consolas", getColor("white"), 60)
+    
+    drawRect(10, 15, 20, 2, getColor("white"))
+    drawString(11, 15.5, strWritten, "Consolas", getColor("black"), 24)
+
+
+
+# El menu de seleccion de usuario
+def renderMenuUser(): 
+    for i in range(0, len(userMenuOptions)):
+        if userMenuSelectedOption-1 == i:
+            color = getRandomColor()
+        else:
+            color = getColor("white")
+        drawString(userMenuX[i], userMenuY[i], userMenuOptions[i], "Consolas", color, 40)
+    
+
+
+def renderUserMenu():
+    if isSelectingProfile: 
+        renderSelectingUser()
+    elif isCreatingNewProfile:
+        renderCreatingUser()
+    else:
+        renderMenuUser()
+        
+    # Pintamos el usuario actual
+    if userSelected[0][0] == "Login Failed":
+        drawString(9, 28, "Usuario o clave incorrecta!", "Consolas", getColor("red"), 30)        
+    elif userSelected[0][0] == "No Seleccionado":
+        drawString(11, 28, "No has iniciado sesion!", "Consolas", getColor("red"), 30)
+    else:
+        drawString(15, 28, "Hola " + userSelected[0][0] + "!", "Consolas", getColor("green"), 30)
+        
+    # Pintamos el mensaje
+    drawString (9, 2, infoMessage, "Consolas", getColor("red"), 40)
+    resetInfoMessage()
 
 # =====================================================================================
 # =====================================================================================
@@ -1711,24 +2135,45 @@ def tickMenu():
     malditoPythonQueNoDejaInicializarFuncionesVacias = 1 # Aqui van a ir los efectos al menu
     
 # Metodo para pintar el menu
-def renderMenu():        
+def renderMenu():     
+    global selectedOptionX   
     # Pintamos el mensaje principal "MENU"
     drawString(15, 1.5, "Menu", "Consolas", getColor("white"), 102)
     
     # Pintamos todas las opciones del menu
     for i in range(0, len(optionNames)):
-        drawString(optionXCoords[i], optionYCoords[i], optionNames[i], "Consolas", getColor("white"), 38)     
+        if i+1 == selectedOption:
+            color = getRandomColor()
+        else:
+            color = getColor("white")
+        drawString(optionXCoords[i], optionYCoords[i], optionNames[i], "Consolas", color, 38)     
     
+    #if selectedOption == MENU_SELECTUSER:
+    #    selectedOptionX = -120
+    #else:
+    #    selectedOptionX = 0
     
-    menuArrowCoords = [(260, selectedOptionY),
-                      (260, selectedOptionY+40),
-                      (300, selectedOptionY+20)]
-    drawPolygon(menuArrowCoords, getColor("white"))  
+    #menuArrowCoords = [(260+selectedOptionX, selectedOptionY),
+    #                  (260+selectedOptionX, selectedOptionY+40),
+    #                  (300+selectedOptionX, selectedOptionY+20)]
+    #drawPolygon(menuArrowCoords, getColor("white")) 
+    
+    # Pintamos el usuario actual
+    if userSelected[0][0] == "Login Failed":
+        drawString(9, 28, "Usuario o clave incorrecta!", "Consolas", getColor("red"), 30)        
+    elif userSelected[0][0] == "No Seleccionado":
+        drawString(11, 28, "No has iniciado sesion!", "Consolas", getColor("red"), 30)
+    else:
+        drawString(15, 28, "Hola " + userSelected[0][0] + "!", "Consolas", getColor("green"), 30)
+        
+    # Pintamos el mensaje
+    drawString (5, 26, infoMessage, "Consolas", getColor("red"), 30)
+    resetInfoMessage()
     
     
 # Metodo para activar el teclado en modo Menu
 def inputMenu(e):
-    global selectedOptionY, selectedOption, enterPressed, isInMenu, isPlaying, isSelectingLevel
+    global selectedOptionY, selectedOption, enterPressed, isInMenu, isPlaying, isSelectingLevel, isInUserMenu,infoMessage, infoMessageTimer
 
     # Movemos el cursor del menu segun sea la tecla
     if (e == KEY_DOWN or e == KEY_S or e == KEY_s) and (selectedOption > 1):
@@ -1741,9 +2186,17 @@ def inputMenu(e):
     # Chequeamos si se presiono ENTER
     if e == KEY_ENTER:
         if selectedOption == MENU_PLAY:
+            print(userSelected[0][0])
+            if userSelected[0][0] != "No Seleccionado" and userSelected[0][0] != "Login Failed":
+                isInMenu = False
+                isSelectingLevel = True
+            else:
+                infoMessage = "Debes seleccionar un usuario primero"
+                infoMessageTimer = time.time()
+        elif selectedOption == MENU_SELECTUSER:
             isInMenu = False
-            isSelectingLevel = True
-            #initActors()
+            isInUserMenu = True    
+            infoMessage = ""        
         elif selectedOption == MENU_EXIT:
             sys.exit()
     
@@ -1759,6 +2212,8 @@ def inputMenu(e):
 
 # Metodo para ver si se completo el nivel
 def tickLevel():    
+    global actualLevel, isPlaying, isInMenu
+    
     for p in range(0, len(breadPositions)):
         x, y = breadPositions[p][0]
         
@@ -1766,7 +2221,17 @@ def tickLevel():
             return
     
     # Si llega aqui es porque terminamos el nivel
-    drawString(mapWidth/2, mapHeight/3, "TERMINO", "Consolas", getColor("white"), 100) 
+    actualLevel += 1
+    print(str(actualLevel) + " de " + str(TOTALLEVELS))
+    
+    if actualLevel <= TOTALLEVELS:
+        loadLevel(actualLevel)
+        initActors()
+    else:
+        print("Terminaste el juego con un puntaje de " + str(SCORE))
+        isPlaying = False
+        isInMenu = True
+    
 
 
 # Pintar todo lo referente al juego (cuando se esta jugando)
@@ -1808,29 +2273,26 @@ def tick():
         
         
 # Input method (Aqui va a controlarse todo lo referente a el teclado/mouse)
-def input(e):    
+def input(e):   
+    key = e.key 
     if isInMenu:
-        inputMenu(e)
+        inputMenu(key)
     elif isSelectingLevel:
-        inputLevelSelection(e)
+        inputLevelSelection(key)
+    elif isInUserMenu:
+        inputUserMenu(e)
     else:
-        inputPlayer(e)       
+        inputPlayer(key)       
         
     
 # Render method (Aqui se pinta el mapa de juego en base a la matriz)
-def render():      
-    #drawRect(10, 10, 300, 400, convertToRGB(255,0,255))
-    #drawLines(10, 20, 150, 190, convertToRGB(255,255,255), 5)
-    #x = math.sin((time.time() * 5000.0 / 5000.0 * math.pi * 2)) * 200
-    #y = math.cos((time.time() * 5000.0 / 5000.0 * math.pi * 2)) * 100
-    #img = pygame.image.load("../res/textures/grid.png")
-    #drawImage(img, 300 + x, 200 + y)
-    #drawString(200, 200, "string", "Consolas", (255, 255, 255), 28)
-    
+def render():          
     if isInMenu:
         renderMenu()
     elif isSelectingLevel:
         renderLevelSelection()
+    elif isInUserMenu:
+        renderUserMenu()
     elif isPlaying:
         renderGame()
 
@@ -1884,7 +2346,7 @@ def mainLoop():
             elif event.type == KEYUP:
                 releaseKeys()
             elif event.type == KEYDOWN:
-                input(event.key)
+                input(event)
             
         
         pygame.display.get_surface().fill((0,0,0))
@@ -1902,6 +2364,10 @@ def mainLoop():
 # =====================================================================================
 # =====================================================================================
 
+# No se conecta :(
+#dbConnection = pymssql.connect(host="host.racksystem2.com", user="salazars_btime", password="21115476eD2567641", database="salazars_burgertime")
+
+loadUsers()
 loadGameObjects()
 
 # Iniciamos el juego
