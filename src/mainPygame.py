@@ -19,6 +19,8 @@ MENU_PLAY = 3
 MENU_SELECTUSER = 2
 MENU_EXIT = 1
 MAX_OPTIONS = 3
+MENU_TITLE = None # Esto tendra la imagen del menu
+MENU_TITLE_TWO = None # Tambien
 
 # Propiedades del menu
 # Para crear una opcion nueva es igual que los monstruos, se anade 1 item a cada arreglo de opciones
@@ -66,6 +68,7 @@ KEY_D = 68
 KEY_W = 87
 KEY_P = 80
 KEY_ENTER = 13
+KEY_NUMPADENTER = 271
 KEY_SPACE = 32
 KEY_BACKSPACE = 8
 
@@ -417,7 +420,7 @@ userMenuY = [10.5, 15.5, 20.5]
 userMenuX = [12,9,13]
 strWritten = ""
 userWritten = ["", ""]
-newUserWritten = [["", "", "", "", "", ""], []]
+newUserWritten = [["", "", "", "", "", ""], [[], [], [], [], [], [], [], []]]
 
 infoMessage = ""
 infoMessageTimer = 0
@@ -532,6 +535,8 @@ def loadUsers():
     
     i = -1
     k = 0 # 0 = info, 1 = scores
+    lvl = 0 # Si es 0 no es un nivel
+    
     # Recorremos cada una de las lineas
     for line in lines:
         # Recortamos el enter del final..
@@ -541,6 +546,7 @@ def loadUsers():
         if line == "<newuser>":
             users.append([])
             i += 1
+            lvl = 0
             # Este es el arreglo de la informacion
             users[i].append([])
             k = 0
@@ -548,8 +554,32 @@ def loadUsers():
             # Arreglo de las puntuaciones
             users[i].append([])
             k = 1
+            # Anado todos los niveles
+            for h in range(0,8):
+                users[i][k].append([])
+            
+            lvl = 0
+        elif line == "<1>":
+            lvl = 1
+        elif line == "<2>":
+            lvl = 2
+        elif line == "<3>":
+            lvl = 3
+        elif line == "<4>":
+            lvl = 4
+        elif line == "<5>":
+            lvl = 5
+        elif line == "<6>":
+            lvl = 6
+        elif line == "<7>":
+            lvl = 7
+        elif line == "<8>":
+            lvl = 8
         else:
-            users[i][k].append(line)    
+            if lvl == 0:
+                users[i][k].append(line)
+            else:
+                users[i][k][lvl-1].append(line)    
             
     
     print(users)
@@ -587,8 +617,10 @@ def rewriteUsersFile():
             file.write(info + "\n")
             
         file.write("<scores>\n")
-        for score in user[1]:
-            file.write(str(score) + "\n")
+        for lvl in range(0,8):
+            for score in user[1][lvl]:
+                file.write("<" + str(lvl+1) + ">\n")
+                file.write(str(score) + "\n")
         
 
 
@@ -1922,7 +1954,7 @@ def inputSelectingUser(e):
     
     if key == KEY_BACKSPACE:
         strWritten = strWritten[:len(strWritten)-1]
-    elif key == KEY_ENTER: 
+    elif key == KEY_ENTER or key == KEY_NUMPADENTER: 
         for i in range(0, len(selectingProfileStates)):
             if selectingProfileStates[i] == True:
                 selectingProfileStates[i] = False
@@ -1947,7 +1979,7 @@ def inputCreatingUser(e):
     
     if key == KEY_BACKSPACE:
         strWritten = strWritten[:len(strWritten)-1]
-    elif key == KEY_ENTER:
+    elif key == KEY_ENTER or key == KEY_NUMPADENTER:
         for i in range(0, len(creatingNewProfileStates)):
             if creatingNewProfileStates[i] == True:
                 creatingNewProfileStates[i] = False
@@ -1962,6 +1994,7 @@ def inputCreatingUser(e):
                     if not userExists(newUserWritten[0][0]):
                         # Creamos el nuevo usuario en memoria
                         users.append(newUserWritten)
+                        print(users)
                         isCreatingNewProfile = False
                         rewriteUsersFile()
                         print(users)
@@ -1994,7 +2027,7 @@ def inputUserMenu(e):
     elif (key == KEY_DOWN or chr == "s" or chr == "S") and (userMenuSelectedOption < USERMENU_MAXOPTIONS):
         userMenuSelectedOption += 1
         
-    if key == KEY_ENTER:
+    if key == KEY_ENTER or key == KEY_NUMPADENTER:
         if userMenuSelectedOption == USERMENU_BACK:
             isInMenu = True
             isInUserMenu = False
@@ -2052,6 +2085,15 @@ def renderCreatingUser():
 
 # El menu de seleccion de usuario
 def renderMenuUser(): 
+    global MENU_TITLE_TWO
+    
+    if MENU_TITLE_TWO == None:
+        MENU_TITLE_TWO = pygame.image.load("../res/logo.jpg")
+    # Pintamos el titulo
+    drawImageR(MENU_TITLE_TWO, 5, 0.2, 30, 10)
+    
+    
+    
     for i in range(0, len(userMenuOptions)):
         if userMenuSelectedOption-1 == i:
             color = getRandomColor()
@@ -2136,9 +2178,14 @@ def tickMenu():
     
 # Metodo para pintar el menu
 def renderMenu():     
-    global selectedOptionX   
+    global selectedOptionX, MENU_TITLE
+    
+    if MENU_TITLE == None:
+        MENU_TITLE = pygame.image.load("../res/mainName.jpg")
+    
     # Pintamos el mensaje principal "MENU"
-    drawString(15, 1.5, "Menu", "Consolas", getColor("white"), 102)
+    #drawString(15, 1.5, "Menu", "Consolas", getColor("white"), 102)
+    drawImageR(MENU_TITLE, 3, 0.5, 35, 10)
     
     # Pintamos todas las opciones del menu
     for i in range(0, len(optionNames)):
@@ -2184,7 +2231,7 @@ def inputMenu(e):
         selectedOption += 1
     
     # Chequeamos si se presiono ENTER
-    if e == KEY_ENTER:
+    if e == KEY_ENTER or e == KEY_NUMPADENTER:
         if selectedOption == MENU_PLAY:
             print(userSelected[0][0])
             if userSelected[0][0] != "No Seleccionado" and userSelected[0][0] != "Login Failed":
