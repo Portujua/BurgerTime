@@ -4,23 +4,21 @@ import math
 import time
 import pygame
 import random
+import pymssql
 from pygame.locals import *
 
 import PIL.Image
-from pyglet.input.evdev_constants import KEY_T
 
 # ============================== Variables ==============================
 
 # Constantes Juego
-TOTALLEVELS = 8
+TOTALLEVELS = 2
 
 # Constantes MENU
-MENU_PLAY = 5
-MENU_SELECTUSER = 4
-MENU_HIGHSCORES = 3
-MENU_HOWTOPLAY = 2
+MENU_PLAY = 3
+MENU_SELECTUSER = 2
 MENU_EXIT = 1
-MAX_OPTIONS = 5
+MAX_OPTIONS = 3
 MENU_TITLE = None # Esto tendra la imagen del menu
 MENU_TITLE_TWO = None # Tambien
 
@@ -28,16 +26,16 @@ MENU_TITLE_TWO = None # Tambien
 # Para crear una opcion nueva es igual que los monstruos, se anade 1 item a cada arreglo de opciones
 # se modifica arriba MAX_OPTIONS, y se anade la opcion nueva
 
-selectedOption = 5              # Opcion seleccionada por defecto
+selectedOption = 3              # Opcion seleccionada por defecto
 selectedOptionY = 200           # Coordenada Y del cursor en el menu
 selectedOptionX  = 260          # Coordenada X del cursor del menu
 selectedOptionWidth = 50        # Ancho del cursor del menu
 selectedOptionHeight = 50       # Alto del cursor del menu
 distanceBetweenOptions = 100    # Distancia entre cada opcion del menu (para mover el triangulo)
 
-optionNames = ["Salir", "Instrucciones", "Altos Puntajes", "Seleccionar Usuario", "Jugar"]
-optionXCoords = [17, 13, 12.5, 10, 17]
-optionYCoords = [22.5, 19.5, 16.5, 13.5, 10.5]
+optionNames = ["Salir", "Seleccionar Usuario", "Jugar"]
+optionXCoords = [17, 10, 17]
+optionYCoords = [20.5, 15.5, 10.5]
 
 
 # Estados del juego
@@ -48,9 +46,6 @@ isPaused = False
 isRunning = True
 isSelectingLevel = False
 isSwitchingLevel = False
-isInHighscores = False
-isInHowToPlay = False
-actualHighscore = "1"
 levelSelected = 1
 actualLevel = 1
 
@@ -72,12 +67,10 @@ KEY_S = 83
 KEY_D = 68
 KEY_W = 87
 KEY_P = 80
-KEY_T = 116
 KEY_ENTER = 13
 KEY_NUMPADENTER = 271
 KEY_SPACE = 32
 KEY_BACKSPACE = 8
-KEY_ESC = 27
 
 KEY_1 = 49
 KEY_2 = 50
@@ -104,11 +97,8 @@ COLOR_FLOOR = 0xFF00FF
 COLOR_STAIRS = 0x00FF00
 
 COLOR_MEAT = 0x975016
-COLOR_TOPBREAD = 0xFF9D00
-COLOR_BOTTOMBREAD = 0xCE7B00
+COLOR_BREAD = 0xFF9D00
 COLOR_LETTUCE = 0x62D551
-COLOR_TOMATO = 0xFF2833
-COLOR_CHEESE = 0xFFE23F
 
 COLOR_EGG = 0xFFEB89
 COLOR_SAUSAGE = 0xFF3B14
@@ -167,9 +157,7 @@ TILE_BOTTOMSTAIRS = 5
 TILE_BREAD = 6
 TILE_MEAT = 7
 TILE_LETTUCE = 8
-TILE_TOMATO = 9
-TILE_CHEESE = 10
-WALKABLE_TILES = [1,2,6,7,8,9,10]
+WALKABLE_TILES = [1,2,6,7,8]
 
 
 # Propiedades de la pimienta
@@ -179,7 +167,6 @@ pepperMapX = []
 pepperMapY = []
 pepperMapTime = []
 PEPPER_MAX_SPAWN_TIME = 5.000000000
-MAXPEPPERS = 6
 pepperTime = 0
 pepperSize = 1
 pepperLastDir = 0
@@ -188,60 +175,32 @@ PEPPER_SPEED = 0.20
 
 ### ---------- Propiedades de la/s hamburguesas ------------
 # Imagenes
-BREADTOP_PATH = "../res/textures/game/hamburguer/breadTop/"
-BREADBOTTOM_PATH = "../res/textures/game/hamburguer/breadBottom/"
+BREAD_PATH = "../res/textures/game/hamburguer/bread/"
 LETTUCE_PATH = "../res/textures/game/hamburguer/lettuce/"
 MEAT_PATH = "../res/textures/game/hamburguer/meat/"
-TOMATO_PATH = "../res/textures/game/hamburguer/tomato/"
-CHEESE_PATH = "../res/textures/game/hamburguer/cheese/"
 
-breadTopImages = []
+breadImages = []
 lettuceImages = []
 meatImages = []
-tomatoImages = []
-cheeseImages = []
-breadBottomImages = []
-
-ingredientsImages = [breadTopImages, lettuceImages, meatImages, tomatoImages, cheeseImages, breadBottomImages]
 
 # Posiciones
-breadTopPositions = []
+breadPositions = []
 lettucePositions = []
 meatPositions = []
-tomatoPositions = []
-cheesePositions = []
-breadBottomPositions = []
-
-ingredientsPositions = [breadTopPositions, lettucePositions, meatPositions, tomatoPositions, cheesePositions, breadBottomPositions]
 
 # Temporizadores para controlar el pisado
-breadTopTimers = []
+breadTimers = []
 lettuceTimers = []
 meatTimers = []
-tomatoTimers = []
-cheeseTimers = []
-breadBottomTimers = []
-
-ingredientsTimers = [breadTopTimers, lettuceTimers, meatTimers, tomatoTimers, cheeseTimers, breadBottomTimers]
 
 # Destinos (para ver si un ingrediente esta bajando..)
-breadTopDestination = []
+breadDestination = []
 lettuceDestination = []
 meatDestination = []
-tomatoDestination = []
-cheeseDestination = []
-breadBottomDestination = []
 
-ingredientsDestinations = [breadTopDestination, lettuceDestination, meatDestination, tomatoDestination, cheeseDestination, breadBottomDestination]
-
-breadTopFloors = []
+breadFloors = []
 lettuceFloors = []
 meatFloors = []
-tomatoFloors = []
-cheeseFloors = []
-breadBottomFloors = []
-
-ingredientsFloors = [breadTopFloors, lettuceFloors, meatFloors, tomatoFloors, cheeseFloors, breadBottomFloors]
 
 # Otros
 TIMETORESET = 2.000000000
@@ -281,12 +240,6 @@ pImages = [[0], # PIMAGE_STAND
 
 # Info del jugador
 playerLifes = 3
-lifeMapX = []
-lifeMapY = []
-lifeMapTime = []
-LIFE_SPAWN_TIME = 5.00000
-lifeSize = 1
-lifeImg = pygame.image.load("../res/textures/game/items/life.png")
 
 
 # Restricciones
@@ -305,7 +258,7 @@ isShooting = False
 
 
 # Posicion
-playerPosition = []
+playerPosition = [3., 23.]
 
 
 
@@ -529,11 +482,11 @@ def loadGameObjects():
     
         
     # Hamburguesa
-    global breadTopImages, lettuceImages, meatImages, tomatoImages, cheeseImages, breadBottomImages
-    # Pan Tope
-    breadTopImages.append(pygame.image.load(BREADTOP_PATH + "left.png"))
-    breadTopImages.append(pygame.image.load(BREADTOP_PATH + "center.png"))
-    breadTopImages.append(pygame.image.load(BREADTOP_PATH + "right.png"))
+    global breadImages, lettuceImages, meatImages
+    # Pan
+    breadImages.append(pygame.image.load(BREAD_PATH + "left.png"))
+    breadImages.append(pygame.image.load(BREAD_PATH + "center.png"))
+    breadImages.append(pygame.image.load(BREAD_PATH + "right.png"))
     
     # Lechuga
     lettuceImages.append(pygame.image.load(LETTUCE_PATH + "left.png"))
@@ -545,20 +498,6 @@ def loadGameObjects():
     meatImages.append(pygame.image.load(MEAT_PATH + "center.png"))
     meatImages.append(pygame.image.load(MEAT_PATH + "right.png"))
     
-    # Tomate
-    tomatoImages.append(pygame.image.load(TOMATO_PATH + "left.png"))
-    tomatoImages.append(pygame.image.load(TOMATO_PATH + "center.png"))
-    tomatoImages.append(pygame.image.load(TOMATO_PATH + "right.png"))
-    
-    # Queso
-    cheeseImages.append(pygame.image.load(CHEESE_PATH + "left.png"))
-    cheeseImages.append(pygame.image.load(CHEESE_PATH + "center.png"))
-    cheeseImages.append(pygame.image.load(CHEESE_PATH + "right.png"))
-    
-    # Pan Abajo
-    breadBottomImages.append(pygame.image.load(BREADBOTTOM_PATH + "left.png"))
-    breadBottomImages.append(pygame.image.load(BREADBOTTOM_PATH + "center.png"))
-    breadBottomImages.append(pygame.image.load(BREADBOTTOM_PATH + "right.png"))
     
     # Mapa
     global mapFloorImage, mapStairsImage
@@ -605,37 +544,6 @@ def spawnPepper():
     pepperMapX.append(convertToMapX(r))
     pepperMapY.append(convertToMapY(r))
     pepperMapTime.append(time.time())
-    
-# Aparecwer una vida en el mapa
-def spawnLife():
-    global lifeMapX, lifeMapY, lifeMapTime
-    
-    r = getRandomMapPosition()
-    lifeMapX.append(convertToMapX(r))
-    lifeMapY.append(convertToMapY(r))
-    lifeMapTime.append(time.time())
-    
-    
-def tickLifeItem():
-    #### Para las que esten por el mapa            
-    global lifeMapTime, lifeMapX, lifeMapY, playerLifes
-    
-    if isAlive:
-        for i in range(0, len(lifeMapTime)):
-            # Para reiniciarlas
-            if time.time() - lifeMapTime[i] > LIFE_SPAWN_TIME:
-                lifeMapTime[i] = 0
-                lifeMapX[i] = 0
-                lifeMapY[i] = 0
-            # Para ver si la agarramos
-            print(lifeMapX)
-            print(lifeMapY)
-            print(i)
-            if math.floor(playerPosition[0]) == lifeMapX[i] and math.floor(playerPosition[1]) == lifeMapY[i]:
-                playerLifes += 1
-                lifeMapX[i] = 0
-                lifeMapY[i] = 0
-
     
 
 
@@ -724,7 +632,7 @@ def doLogin(user, password):
         if u[0][0] == user and u[0][1] == password:
             return u
     
-    return [["Login Failed", "Login Failed", "Login Failed", "Login Failed", "Login Failed", "Login Failed"], []]
+    return ["Login Failed", "Login Failed", "Login Failed", "Login Failed", "Login Failed", "Login Failed"]
 
 
 # Metodo para reescribir el archivo
@@ -813,44 +721,31 @@ def loadImage(filePath):
 
 # Metodo para reiniciar todos los obj hamburguesas
 def resetHamburguerObjects():
-    global breadBottomPositions, breadBottomTimers, breadBottomDestination, breadBottomFloors, cheesePositions, cheeseTimers, cheeseDestination, cheeseFloors, tomatoPositions, tomatoTimers, tomatoDestination, tomatoFloors, breadTopPositions, lettucePositions, meatPositions, breadTopTimers, lettuceTimers, meatTimers, breadTopDestination, lettuceDestination, meatDestination, breadTopFloors, lettuceFloors, meatFloors
+    global breadPositions, lettucePositions, meatPositions, breadTimers, lettuceTimers, meatTimers, breadDestination, lettuceDestination, meatDestination, breadFloors, lettuceFloors, meatFloors
     
     # Posiciones
-    breadTopPositions = []
+    breadPositions = []
     lettucePositions = []
     meatPositions = []
-    tomatoPositions = []
-    cheesePositions = []
-    breadBottomPositions = []
     
     # Temporizadores para controlar el pisado
-    breadTopTimers = []
+    breadTimers = []
     lettuceTimers = []
     meatTimers = []
-    tomatoTimers = []
-    cheeseTimers = []
-    breadBottomTimers = []
     
     # Destinos (para ver si un ingrediente esta bajando..)
-    breadTopDestination = []
+    breadDestination = []
     lettuceDestination = []
     meatDestination = []
-    tomatoDestination = []
-    cheeseDestination = []
-    breadBottomDestination = []
     
-    # Pisos
-    breadTopFloors = []
+    breadFloors = []
     lettuceFloors = []
     meatFloors = []
-    tomatoFloors = []
-    cheeseFloors = []
-    breadBottomFloors = []
 
 
 # Metodo para cargar el mapa de una imagen (pixel a pixel)
 def loadMap(filePath):
-    global breadTopPositions, meatPositions, lettucePositions, tomatoPositions, cheesePositions, breadBottomPositions, monstersInLevel
+    global breadPositions, meatPositions, lettucePositions, monstersInLevel
     
     # Reinicializamos todos los objetos de hamburguesas
     resetHamburguerObjects()
@@ -877,12 +772,9 @@ def loadMap(filePath):
     mapHeight = iy
     
     # Contadores para ir anadiendo objetos leidos
-    cTBread = -1 
+    cBread = -1 
     cLettuce = -1
     cMeat = -1
-    cTomato = -1
-    cCheese = -1
-    cBBread = -1
     
     sameObject = False
 
@@ -905,26 +797,8 @@ def loadMap(filePath):
             elif rgb == COLOR_STAIRS:
                 sameObject = False
                 mapReaded.append(TILE_STAIRS)
-            # ========== PAN ARRIBA ==========
-            elif rgb == COLOR_TOPBREAD:
-                mapReaded.append(TILE_FLOOR)
-                # Si NO es el mismo objeto previo que estabamos anadiendo, entonces
-                # Es porque este es un nuevo objeto y debemos crearlo..
-                # La siguiente vez que entre (con el siguiente pixel) si es igual un pan
-                # Entonces va a pegar el pan en la posicion actual en vez de "crear" un 
-                # nuevo objeto de pan
-                if not sameObject: 
-                    sameObject = True
-                    cTBread += 1
-                    breadTopPositions.append([])
-                    breadTopTimers.append([])
-                    breadTopDestination.append(0)
-                    breadTopFloors.append(0)
-
-                breadTopPositions[cTBread].append((x, y))
-                breadTopTimers[cTBread].append(0)
             # ========== PAN ==========
-            elif rgb == COLOR_BOTTOMBREAD:
+            elif rgb == COLOR_BREAD:
                 mapReaded.append(TILE_FLOOR)
                 # Si NO es el mismo objeto previo que estabamos anadiendo, entonces
                 # Es porque este es un nuevo objeto y debemos crearlo..
@@ -933,14 +807,14 @@ def loadMap(filePath):
                 # nuevo objeto de pan
                 if not sameObject: 
                     sameObject = True
-                    cBBread += 1
-                    breadBottomPositions.append([])
-                    breadBottomTimers.append([])
-                    breadBottomDestination.append(0)
-                    breadBottomFloors.append(0)
+                    cBread += 1
+                    breadPositions.append([])
+                    breadTimers.append([])
+                    breadDestination.append(0)
+                    breadFloors.append(0)
 
-                breadBottomPositions[cBBread].append((x, y))
-                breadBottomTimers[cBBread].append(0)
+                breadPositions[cBread].append((x, y))
+                breadTimers[cBread].append(0)
             # ========== CARNE ==========
             elif rgb == COLOR_MEAT:
                 mapReaded.append(TILE_FLOOR)
@@ -977,65 +851,16 @@ def loadMap(filePath):
 
                 lettucePositions[cLettuce].append((x, y))
                 lettuceTimers[cLettuce].append(0) 
-            # ========== TOMATE ==========
-            elif rgb == COLOR_TOMATO:
-                mapReaded.append(TILE_FLOOR)
-                # Si NO es el mismo objeto previo que estabamos anadiendo, entonces
-                # Es porque este es un nuevo objeto y debemos crearlo..
-                # La siguiente vez que entre (con el siguiente pixel) si es igual un tomate
-                # Entonces va a pegar el tomate en la posicion actual en vez de "crear" un 
-                # nuevo objeto de tomate
-                if not sameObject:
-                    sameObject = True
-                    cTomato += 1
-                    tomatoPositions.append([])
-                    tomatoTimers.append([])
-                    tomatoDestination.append(0)
-                    tomatoFloors.append(0)
-                
-                tomatoPositions[cTomato].append((x, y))
-                tomatoTimers[cTomato].append(0)
-            # ========== QUESO ==========
-            elif rgb == COLOR_CHEESE:
-                mapReaded.append(TILE_FLOOR)
-                # Si NO es el mismo objeto previo que estabamos anadiendo, entonces
-                # Es porque este es un nuevo objeto y debemos crearlo..
-                # La siguiente vez que entre (con el siguiente pixel) si es igual un queso
-                # Entonces va a pegar el queso en la posicion actual en vez de "crear" un 
-                # nuevo objeto de queso
-                if not sameObject:
-                    sameObject = True
-                    cCheese += 1
-                    cheesePositions.append([])
-                    cheeseTimers.append([])
-                    cheeseDestination.append(0)
-                    cheeseFloors.append(0)
-                
-                cheesePositions[cCheese].append((x, y))
-                cheeseTimers[cCheese].append(0)
             else:
                 if rgb == COLOR_EGG:
                     monstersInLevel.append(MONSTER_EGG)
-                    monstersPaths.append(None)
                 elif rgb == COLOR_SAUSAGE:
                     monstersInLevel.append(MONSTER_SAUSAGE)
-                    monstersPaths.append(None)
                 elif rgb == COLOR_GHERKIN:
                     monstersInLevel.append(MONSTER_GHERKIN)
-                    monstersPaths.append(None)
                 sameObject = False
                 mapReaded.append(TILE_NULL)
             
-    # Actualizamos en memoria xd
-    global ingredientsImages, ingredientsPositions, ingredientsTimers, ingredientsDestinations, ingredientsFloors
-    
-    ingredientsImages = [breadTopImages, lettuceImages, meatImages, tomatoImages, cheeseImages, breadBottomImages]
-    ingredientsPositions = [breadTopPositions, lettucePositions, meatPositions, tomatoPositions, cheesePositions, breadBottomPositions]
-    ingredientsTimers = [breadTopTimers, lettuceTimers, meatTimers, tomatoTimers, cheeseTimers, breadBottomTimers]
-    ingredientsDestinations = [breadTopDestination, lettuceDestination, meatDestination, tomatoDestination, cheeseDestination, breadBottomDestination]
-    ingredientsFloors = [breadTopFloors, lettuceFloors, meatFloors, tomatoFloors, cheeseFloors, breadBottomFloors]        
-            
-    
     # Retornamos el mapa leido
     return mapReaded
 
@@ -1062,7 +887,7 @@ def convertToMapY(pos):
 # Metodo para obtener una posicion aleatoria en el mapa
 def getRandomMapPosition():
     while True:
-        r = random.randint(0, mapWidth*mapHeight - 1)
+        r = random.randint(0, mapWidth*mapHeight)
         if map[r] == TILE_FLOOR:
             return r
         
@@ -1171,23 +996,20 @@ def getPathTo(a, b, path, visited, allPaths, iteration):
     # Si terminamos de recorrer todos los hijos y no llegamos, devolvemos FALSE
     # Chequeamos si estamos en el loop principal, si es asi entonces devolvemos el mismo punto donde estabamos
     if iteration == 0:
-        if len(allPaths) > 0:
-            # Creamos una variable para guardar el camino mas corto
-            shortestPath = allPaths[0]
-            shortestLength = len(shortestPath)
-            
-            # Vemos cual de todos es el mas corto
-            for p in allPaths:
-                if len(p) < shortestLength:
-                    shortestPath = p
-                    shortestLength = len(p)
-                #print("Un camino de ", len(p), " es: ", p)
-            
-            #print("")
-            #print("El mas corto fue de ", shortestLength, " y es: ", shortestPath)
-            return shortestPath
-        else:
-            return None
+        # Creamos una variable para guardar el camino mas corto
+        shortestPath = allPaths[0]
+        shortestLength = len(shortestPath)
+        
+        # Vemos cual de todos es el mas corto
+        for p in allPaths:
+            if len(p) < shortestLength:
+                shortestPath = p
+                shortestLength = len(p)
+            #print("Un camino de ", len(p), " es: ", p)
+        
+        #print("")
+        #print("El mas corto fue de ", shortestLength, " y es: ", shortestPath)
+        return shortestPath
     else: # Sino, devolvemos falso para notificar que termino el loop y no encontro camino con ese hijo
         return False
     
@@ -1262,7 +1084,7 @@ def initActors():
     isShooting = False
     
     # Inicializamos todos los arreglos de los monstruos
-    global mNames, mX, mY, mHeight, mWidth, mSpeedX, mSpeedY, monstersActualImageToDraw, respawnArray, pepperMapX, pepperMapY, pepperMapTime, lifeMapX, lifeMapY, lifeMapTime
+    global mNames, mX, mY, mHeight, mWidth, mSpeedX, mSpeedY, monstersActualImageToDraw, respawnArray, pepperMapX, pepperMapY, pepperMapTime
     mNames = []
     mX = []
     mY = []
@@ -1275,9 +1097,6 @@ def initActors():
     pepperMapX = []
     pepperMapY = []
     pepperMapTime = []
-    lifeMapX = []
-    lifeMapY = []
-    lifeMapTime = []
     
     # Le asignamos una posicion random al jugador
     r = getRandomMapPosition()
@@ -1384,26 +1203,6 @@ def drawMap():
 # =====================================================================================
 # =====================================================================================
 
-# Metodo para ver si los ingredientes caen encima de algun monstruo
-def checkCollisionWithMonsters(x, y):
-    global respawnArray, monstersPaths, mX, mY
-    
-    for m in range(0, len(mNames)):
-        monsterX = math.floor(mX[m])
-        # Si le pegamos a algun monstruo
-        if (x == monsterX or x+1 == monsterX or x+2 == monsterX or x+3 == monsterX) and y == math.floor(mY[m]):
-            # Creamos un item de vida en el mapa
-            spawnLife()
-            # Borramos ese monstruo
-            addScore(1050)
-            respawnArray[m] = time.time()
-            monstersPaths[m] = None
-            r = getRandomMapPosition()
-            mX[m] = convertToMapX(r)
-            mY[m] = convertToMapY(r)   
-            
-                
-
 # Metodo para obtener el numero de entidades que estan encima de los ingredientes
 def getNumberOfEntitiesOn(ingredient):
     total = 0
@@ -1421,7 +1220,7 @@ def getNumberOfEntitiesOn(ingredient):
             if ix == math.floor(mX[m]) and iy == math.floor(mY[m]):
                 total += 1
         
-    print("Va a bajar ", total)
+    #print("Va a bajar ", total)
     return total
     
     
@@ -1436,10 +1235,6 @@ def moveDown(ingredient, numberOfFloors):
     
     # Coincidencias de piso (Para bajar n pisos)
     coincidences = 0
-
-    # Arreglamos los pisos a bajar si estan malos
-    if str(numberOfFloors) == "[0]" or str(numberOfFloors) == "[0, 0]" or str(numberOfFloors) == "[0, 0, 0]" or str(numberOfFloors) == "[0, 0, 0, 0]" or str(numberOfFloors) == "[0, 0, 0, 0, 0]" or str(numberOfFloors) == "[0, 0, 0, 0, 0, 0]" or str(numberOfFloors) == "[0, 0, 0, 0, 0, 0, 0]" or str(numberOfFloors) == "[0, 0, 0, 0, 0, 0, 0, 0]" or str(numberOfFloors) == "[0, 0, 0, 0, 0, 0, 0, 0, 0]":
-        numberOfFloors = 1
     
     # Busco donde esta la siguiente plataforma desde esa Y hacia abajo
     nextY = 1
@@ -1466,124 +1261,294 @@ def resetTimer(ingredient):
                 
 # Metodo para ver si el ingrediente enviado como parametro colisiona con algun otro ingrediente                
 def checkCollision(ingredient, numberOfFloors):
-    global ingredientsPositions, ingredientsDestinations
+    global breadDestination, lettuceDestination, meatDestination
     
     # Obtenemos las coordenadas del parametro
     ix, iy = ingredient[0]
     
-    # Chequeamos la colision en cada uno de los ingredientes
-    for type in range(0, len(ingredientsPositions)):
-        # Recorremos cada ingrediente actual 
-        for ing in range(0, len(ingredientsPositions[type])):
-            if ingredient == ingredientsPositions[type][ing]:
-                continue
-            ax, ay = ingredientsPositions[type][ing][0]
-            if ix == ax and math.floor(iy+1) == ay:
-                ingredientsDestinations[type][ing] = moveDown(ingredientsPositions[type][ing], numberOfFloors)
-                addScore(500 + int(ingredientsDestinations[type][ing] / 10) * 200)        
+    # Chequeamos colision en los panes
+    for p in range(0, len(breadPositions)):
+        if ingredient == breadPositions[p]:
+            continue
+        px, py = breadPositions[p][0]
+        if ix == px and math.floor(iy+1) == py:
+            breadDestination[p] = moveDown(breadPositions[p], numberOfFloors)
+            addScore(500 + int(breadDestination[p] / 10) * 200)
+            
+    
+    # Chequeamos colision en las lechugas
+    for l in range(0, len(lettucePositions)):
+        if ingredient == lettucePositions[l]:
+            continue
+        lx, ly = lettucePositions[l][0]
+        if ix == lx and math.floor(iy+1) == ly:
+            lettuceDestination[l] = moveDown(lettucePositions[l], numberOfFloors)
+            addScore(500 + int(lettuceDestination[l] / 10) * 200)
+    
+    # Chequeamos colision en las carnes
+    for c in range(0, len(meatPositions)):
+        if ingredient == meatPositions[c]:
+            continue
+        cx, cy = meatPositions[c][0]
+        if ix == cx and math.floor(iy+1) == cy:
+            meatDestination[c] = moveDown(meatPositions[c], numberOfFloors)
+            addScore(500 + int(meatDestination[c] / 10) * 200)
         
+        
+    
     
 
 # Metodo para actualizar las posiciones de los ingredientes que estan cayendo
 def tickIngredients():
-    global ingredientsPositions, ingredientsDestinations
+    global breadDestination, breadPositions, lettuceDestination, lettucePositions, meatDestination, meatPositions
     
-    # Recorremos todos los tipos de ingredientes
-    for type in range(0, len(ingredientsPositions)):
-        # Recorremos cada ingrediente de ese tipo
-        for ing in range(0, len(ingredientsPositions[type])):
-            if ingredientsDestinations[type][ing] == 0:
-                continue
-            # Recorremos todas las posiciones para ir bajandolas
-            for pos in range(0, len(ingredientsPositions[type][ing])):
-                x, y = ingredientsPositions[type][ing][pos]
-                y += fallSpeed
-                if y > ingredientsDestinations[type][ing]:
-                    y = ingredientsDestinations[type][ing]
-                # Asignamos el nuevo valor
-                ingredientsPositions[type][ing][pos] = (x, y)
-            # Chequeamos la colision
-            checkCollision(ingredientsPositions[type][ing], ingredientsFloors[type])
-            # Vemos si llegamos al destino para quitar el "destino"
-            x, y = ingredientsPositions[type][ing][0]
-            if y == ingredientsDestinations[type][ing]:
-                ingredientsDestinations[type][ing] = 0
-                checkCollisionWithMonsters(x, y)  
+    # Recorremos todos los panes
+    for p in range(0, len(breadDestination)):
+        if breadDestination[p] == 0:
+            continue
+        # Recorremos todas las posiciones para ir bajandolas
+        for i in range(0, len(breadPositions[p])):
+            x, y = breadPositions[p][i]
+            y += fallSpeed
+            if y > breadDestination[p]:
+                y = breadDestination[p]                
+            # Asignamos el nuevo valor
+            breadPositions[p][i] = (x, y)
+        # Chequeamos la colision
+        checkCollision(breadPositions[p], breadFloors)
+        # Vemos si llegamos al destino para quitar el "destino"
+        x, y = breadPositions[p][0]
+        if y == breadDestination[p]:
+            breadDestination[p] = 0
+            
+    
+    # Recorremos todas las lechugas
+    for l in range(0, len(lettuceDestination)):
+        if lettuceDestination[l] == 0:
+            continue
+        # Recorremos todas las posiciones para ir bajandolas
+        for i in range(0, len(lettucePositions[l])):
+            x, y = lettucePositions[l][i]
+            y += fallSpeed
+            if y > lettuceDestination[l]:
+                y = lettuceDestination[l]                
+            # Asignamos el nuevo valor
+            lettucePositions[l][i] = (x, y)
+        # Chequeamos la colision
+        checkCollision(lettucePositions[l], lettuceFloors)
+        # Vemos si llegamos al destino para quitar el "destino"
+        x, y = lettucePositions[l][0]
+        if y == lettuceDestination[l]:
+            lettuceDestination[l] = 0
+            
+            
+    # Recorremos todas las carnes
+    for c in range(0, len(meatDestination)):
+        if meatDestination[c] == 0:
+            continue
+        # Recorremos todas las posiciones para ir bajandolas
+        for i in range(0, len(meatPositions[c])):
+            x, y = meatPositions[c][i]
+            y += fallSpeed
+            if y > meatDestination[c]:
+                y = meatDestination[c]                
+            # Asignamos el nuevo valor
+            meatPositions[c][i] = (x, y)
+        # Chequeamos la colision
+        checkCollision(meatPositions[c], meatFloors)
+        # Vemos si llegamos al destino para quitar el "destino"
+        x, y = meatPositions[c][0]
+        if y == meatDestination[c]:
+            meatDestination[c] = 0
+            
         
     
 
 # Metodo para poder llevar a cabo el "bajar" las partes
 def tickHamburguers():
-    global ingredientsFloors, ingredientsDestinations, ingredientsTimers
+    global breadTimers, lettuceTimers, meatTimers, breadDestination, lettuceDestination, meatDestination, breadFloors, lettuceFloors, meatFloors
     # Revisamos si pisamos alguno de los cuadros de los objetos primero.. 
     # De ser asi, iniciamos un temporizador para mantener ese cuadro pisado por X tiempo
-    # Y ver si el ingrediente cae    
-    # Primero setteamos el timer de lo que estemos pisando y reiniciamos los que no
+    # Y ver si el ingrediente cae
     
-    # Recorremos todos los tipos de ingredientes
-    for type in range(0, len(ingredientsPositions)):
-        # Recorremos todos los ingredientes de este tipo
-        for ing in range(0, len(ingredientsPositions[type])):            
-            # Recorremos todas las posiciones del ingrediente actual
-            for pos in range(0, len(ingredientsPositions[type][ing])):
-                # Vemos si estamos pisando el actual para settearle el tiempo
-                x, y = ingredientsPositions[type][ing][pos]
-                if math.floor(playerPosition[0]) == x and math.floor(playerPosition[1]) == y:
-                    ingredientsTimers[type][ing][pos] = time.time()
-                
-                # Vemos si se cumplio el tiempo para resetearselo
-                if time.time() - ingredientsTimers[type][ing][pos] > TIMETORESET:
-                    ingredientsTimers[type][ing][pos] = 0
+    # Primero setteamos el timer de lo que estemos pisando y reiniciamos los que no
+    # Recorremos todos los panes
+    for p in range(0, len(breadPositions)):
+        # Recorremos todas las posiciones del pan actual
+        for i in range(0, len(breadPositions[p])):
+            # Vemos si estamos pisando el actual para settearle el tiempo
+            x, y = breadPositions[p][i]
+            if math.floor(playerPosition[0]) == x and math.floor(playerPosition[1]) == y:
+                breadTimers[p][i] = time.time()
             
-            # Ahora vemos si algun ingrediente ya fue todo pisado para bajarlo       
-            # Creamos una variable para ver cuantos items del objeto actual
-            # Estan pisados
-            checkedItems = 0
-            
-            # Recorremos todos los cuadros del ingrediente actual
-            for sqm in range(0, len(ingredientsTimers[type][ing])):
-                # Si es distinto de cero, esta piso y sumo 1 al contador
-                if ingredientsTimers[type][ing][sqm] != 0:
-                    checkedItems += 1
-            # Luego, verifico si el numero de pisados es igual a la longitud del ingrediente
-            if checkedItems == len(ingredientsTimers[type][ing]):
-                ingredientsFloors[type] = getNumberOfEntitiesOn(ingredientsPositions[type][ing])
-                ingredientsDestinations[type][ing] = moveDown(ingredientsPositions[type][ing], ingredientsFloors[type])
-                ingredientsTimers[type][ing] = resetTimer(ingredientsTimers[type][ing])
-                addScore(ingredientsFloors[type] * 200 + int(ingredientsDestinations[type][ing] / 10) * 300)
-                spawnPepper()
+            # Vemos si se cumplio el tiempo para resetear el tiempo
+            if time.time() - breadTimers[p][i] > TIMETORESET:
+                breadTimers[p][i] = 0
+    
+    
+    # Recorremos todas las lechugas
+    for l in range(0, len(lettucePositions)):
+        # Recorremos todas las posiciones de la lechuga actual
+        for i in range(0, len(lettucePositions[l])):
+            # Vemos si estamos pisando el actual para settearle el tiempo
+            x, y = lettucePositions[l][i]
+            if math.floor(playerPosition[0]) == x and math.floor(playerPosition[1]) == y:
+                lettuceTimers[l][i] = time.time()
                 
+            # Vemos si se cumplio el tiempo para resetear el tiempo
+            if time.time() - lettuceTimers[l][i] > TIMETORESET:
+                lettuceTimers[l][i] = 0
+
+
+    # Recorremos todas las carnes
+    for c in range(0, len(meatPositions)):
+        # Recorremos todas las posiciones de la carne actual
+        for i in range(0, len(meatPositions[c])):
+            # Vemos si estamos pisando el actual para settearle el tiempo
+            x, y = meatPositions[c][i]
+            if math.floor(playerPosition[0]) == x and math.floor(playerPosition[1]) == y:
+                meatTimers[c][i] = time.time()
+                
+            # Vemos si se cumplio el tiempo para resetear el tiempo
+            if time.time() - meatTimers[c][i] > TIMETORESET:
+                meatTimers[c][i] = 0
+                
+                
+    # Luego vemos si algun ingrediente ya fue todo pisado para bajarlo
+    
+    # Revisamos los panes
+    for p in range(0, len(breadTimers)):
+        # Creamos una variable para ver cuantos items del objeto actual
+        # Estan pisados
+        checkedItems = 0
+        # Recorremos todos los cuadros del ingrediente actual
+        for i in range(0, len(breadTimers[p])):
+            # Si es distinto de cero, esta pisado y sumo 1 al contador
+            if breadTimers[p][i] != 0:
+                checkedItems += 1
+        # Luego, verifico si el numero de pisados es igual a la longitud del ingrediente
+        if checkedItems == len(breadTimers[p]):
+            breadFloors = getNumberOfEntitiesOn(breadPositions[p])
+            breadDestination[p] = moveDown(breadPositions[p], breadFloors)
+            breadTimers[p] = resetTimer(breadTimers[p])
+            addScore(breadFloors * 200 + int(breadDestination[p] / 10) * 300)
+            spawnPepper()
+            
+            
+    # Revisamos las lechugas
+    for l in range(0, len(lettuceTimers)):
+        # Creamos una variable para ver cuantos items del objeto actual
+        # Estan pisados
+        checkedItems = 0
+        # Recorremos todos los cuadros del ingrediente actual
+        for i in range(0, len(lettuceTimers[l])):
+            # Si es distinto de cero, esta pisado y sumo 1 al contador
+            if lettuceTimers[l][i] != 0:
+                checkedItems += 1
+        # Luego, verifico si el numero de pisados es igual a la longitud del ingrediente
+        if checkedItems == len(lettuceTimers[l]):
+            lettuceFloors = getNumberOfEntitiesOn(lettucePositions[l])
+            lettuceDestination[l] = moveDown(lettucePositions[l], lettuceFloors)
+            lettuceTimers[l] = resetTimer(lettuceTimers[l])
+            addScore(lettuceFloors * 200 + int(lettuceDestination[l] / 10) * 300)
+            spawnPepper()
+            
+            
+    # Revisamos las carnes
+    for c in range(0, len(meatTimers)):
+        # Creamos una variable para ver cuantos items del objeto actual
+        # Estan pisados
+        checkedItems = 0
+        # Recorremos todos los cuadros del ingrediente actual
+        for i in range(0, len(meatTimers[c])):
+            # Si es distinto de cero, esta pisado y sumo 1 al contador
+            if meatTimers[c][i] != 0:
+                checkedItems += 1
+        # Luego, verifico si el numero de pisados es igual a la longitud del ingrediente
+        if checkedItems == len(meatTimers[c]):
+            meatFloors = getNumberOfEntitiesOn(meatPositions[c])
+            meatDestination[c] = moveDown(meatPositions[c], meatFloors)
+            meatTimers[c] = resetTimer(meatTimers[c])
+            addScore(meatFloors * 200 + int(meatDestination[c] / 10) * 300)
+            spawnPepper()
     
     tickIngredients()
     
 
 # Metodo para pintar las hamburguesas
 def renderHamburguers():
-    # Recorremos todos los tipos de ingredientes
-    for type in range(0, len(ingredientsPositions)):
-        # Recorremos todos los ingredientes de ese tipo
-        for ing in range(0, len(ingredientsPositions[type])):
-            # Recorremos todas las posiciones del ingrediente actual
-            for pos in range(0, len(ingredientsPositions[type][ing])):
-                x, y = ingredientsPositions[type][ing][pos]
-                # Si el ingrediente esta pisado lo pintaremos 10px mas abajo
-                offset = 0
-                if ingredientsTimers[type][ing][pos] != 0:
-                    offset = offsetWhenWalked
-                
-                # Pintamos la textura izquierda si i = 0
-                # Si i = len-1 pintamos la textura derecha
-                # Sino la textura central
+    # Pintamos los panes
+    # Recorremos todos los panes
+    for p in range(0, len(breadPositions)):
+        # Recorremos todas las posiciones del pan actual
+        for i in range(0, len(breadPositions[p])):
+            x, y = breadPositions[p][i]
+            # Si el ingrediente esta pisado, lo pintaremos 10px mas abajo
+            offset = 0
+            if breadTimers[p][i] != 0:
+                offset = offsetWhenWalked
+            
+            # Pintamos la textura izquierda si i = 0
+            # Si i = len-1 pintamos la textura derecha
+            # Sino la textura central
+            textureToUse = 0
+            if i == 0:
                 textureToUse = 0
-                if pos == 0:
-                    textureToUse = 0
-                elif pos == len(ingredientsPositions[type][ing]) - 1:
-                    textureToUse = 2
-                else:
-                    textureToUse = 1
-                drawImageR(ingredientsImages[type][textureToUse], x, y + offset, TILE_SIZE, TILE_SIZE)
+            elif i == len(breadPositions[p]) - 1:
+                textureToUse = 2
+            else:
+                textureToUse = 1
+            drawImageR(breadImages[textureToUse], x, y + offset, TILE_SIZE, TILE_SIZE)
+
     
-    
+    # Pintamos las lechugas
+    # Recorremos todas las lechugas
+    for l in range(0, len(lettucePositions)):
+        # Recorremos todas las posiciones de la lechuga actual
+        for i in range(0, len(lettucePositions[l])):
+            x, y = lettucePositions[l][i]            
+            # Si el ingrediente esta pisado, lo pintaremos 10px mas abajo
+            offset = 0
+            if lettuceTimers[l][i] != 0:
+                offset = offsetWhenWalked
+                
+            # Pintamos la textura izquierda si i = 0
+            # Si i = len-1 pintamos la textura derecha
+            # Sino la textura central
+            textureToUse = 0
+            if i == 0:
+                textureToUse = 0
+            elif i == len(lettucePositions[l]) - 1:
+                textureToUse = 2
+            else:
+                textureToUse = 1
+            drawImageR(lettuceImages[textureToUse], x, y + offset, TILE_SIZE, TILE_SIZE)
+
+
+    # Pintamos las carnes
+    # Recorremos todas las carnes
+    for c in range(0, len(meatPositions)):
+        # Recorremos todas las posiciones de la carne actual
+        for i in range(0, len(meatPositions[c])):
+            x, y = meatPositions[c][i]
+            # Si el ingrediente esta pisado, lo pintaremos 10px mas abajo
+            offset = 0
+            if meatTimers[c][i] != 0:
+                offset = offsetWhenWalked
+            
+            # Pintamos la textura izquierda si i = 0
+            # Si i = len-1 pintamos la textura derecha
+            # Sino la textura central
+            textureToUse = 0
+            if i == 0:
+                textureToUse = 0
+            elif i == len(meatPositions[c]) - 1:
+                textureToUse = 2
+            else:
+                textureToUse = 1
+            drawImageR(meatImages[textureToUse], x, y + offset, TILE_SIZE, TILE_SIZE)
+
+
 
 # =====================================================================================
 # =====================================================================================
@@ -1643,7 +1608,7 @@ def tickPepper():
             pepperMapX[i] = 0
             pepperMapY[i] = 0
         # Para ver si la agarramos
-        if math.floor(playerPosition[0]) == pepperMapX[i] and math.floor(playerPosition[1]) == pepperMapY[i] and PEPPER_IN_STOCK < MAXPEPPERS:
+        if math.floor(playerPosition[0]) == pepperMapX[i] and math.floor(playerPosition[1]) == pepperMapY[i]:
             PEPPER_IN_STOCK += 1
             pepperMapX[i] = 0
             pepperMapY[i] = 0
@@ -1667,7 +1632,6 @@ def tickPlayer():
     global canClimb, isClimbing, isAlive, isInMenu, isPlaying, playerLifes
     
     tickPepper()
-    tickLifeItem()
     
     # Revisamos primero que nada si no estamos vivos para reiniciar todo
     if not isAlive:
@@ -1727,25 +1691,14 @@ def tickPlayer():
 
 # Metodo para pintar el HUD del jugador
 def renderHUD():
-    # Pintamos las vidas
-    for i in range(0, playerLifes):
-        drawImageR(lifeImg, 1 + i, 1, lifeSize, lifeSize)        
-    
-    #drawString(1, 1, "Vidas: " + str(playerLifes), "Consolas", getColor("white"), 32)  
+    drawString(1, 1, "Vidas: " + str(playerLifes), "Consolas", getColor("white"), 32)  
     drawString(30, 1, "Score: " + str(SCORE), "Consolas", getColor("white"), 28)
     drawString(mapWidth/2.0 - 1.0, 0.5, "Nivel " + str(actualLevel), "Tahoma", getColor("white"), 20)
     
     # Pintamos la pimienta restante 
     for i in range(0, PEPPER_IN_STOCK):        
-        drawImageR(pepperImg, 1 + i, 2, pepperSize, pepperSize)    
+        drawImageR(pepperImg, 10 + i, 1, 1, 1)    
     
-
-# Metodo para pintar los items de vida por el mapa
-def renderLifeItems():
-    for i in range(0, len(lifeMapX)):
-        if lifeMapX[i] != 0 and lifeMapY[i] != 0:
-            drawImageR(lifeImg, lifeMapX[i], lifeMapY[i], lifeSize, lifeSize)
-
 
     
 # Metodo para obtener la textura que vamos a usar para pintar
@@ -1846,9 +1799,6 @@ def renderPlayer():
     # Pintamos la pimienta que lanzamos (si es que la lanzamos)
     renderPepper()
     
-    # Pintamos los items de vida por el mapa
-    renderLifeItems()
-    
     
 
 # Metodo para activar el teclado en modo jugador
@@ -1914,13 +1864,14 @@ def inputPlayer(e):
 # =====================================================================================
 # =====================================================================================
 
-# Metodo para ver si los monstruos colisionan con la pimienta disparada
+# Metodo para ver si la pimienta lanzada colisiona con algun monstruo
 def monstersCheckCollision():
-    global respawnArray, mX, mY, monstersPaths
+    global respawnArray, mX, mY
     
     if isShooting:
         for m in range(0, len(mNames)):
-            # Colision con la pimienta lanzada
+            #print("Pepper X = ", pepperPos[0])
+            #print("mx = ", mX[m])
             if ((pepperPos[0] + pepperSize/2.0 >= mX[m]) 
                 and (pepperPos[0] + pepperSize/2.0 <= mX[m] + mWidth[m])
                 and (pepperPos[1] + pepperSize/2.0 >= mY[m])
@@ -1928,10 +1879,10 @@ def monstersCheckCollision():
                 # Si entra aqui, la pimienta le pego
                 addScore(350)
                 respawnArray[m] = time.time()
-                monstersPaths[m] = None
                 r = getRandomMapPosition()
                 mX[m] = convertToMapX(r)
-                mY[m] = convertToMapY(r)                
+                mY[m] = convertToMapY(r)
+                
                 
 
 
@@ -1994,7 +1945,7 @@ def setMonsterActualTexture(mDir, mAct):
 
 # Metodo para que se muevan los monstruos
 def tickMonsters():
-    global isAlive, monstersActualImageToDraw, monstersPaths
+    global isAlive, monstersActualImageToDraw
     
     respawnMonsters()
     
@@ -2014,28 +1965,6 @@ def tickMonsters():
         monsterPos = (math.floor(mX[i]), math.floor(mY[i]))
 
         # Calculamos el camino
-        # Si no esta setteado el camino, lo setteamos
-        if monstersPaths[i] == None:
-            monstersPaths[i] = getPathTo(monsterPos, playerPos, [], [], [], 0)
-        else:    
-            # Si ya existe el camino, chequeamos si el ultimo nodo es distinto a la posicion del jugador
-            # De ser asi, la unica opcion posible es que se halla movido 1 cuadro hacia N,S,E,O
-            # En dado caso de ser asi, se debe pegar la nueva posicion del jugador al camino si es que
-            # esta posicion no existe en el camino.. De ya existir, se debe restar la ultima al camino       
-            if monstersPaths[i][len(monstersPaths[i]) - 1] != playerPos:
-                #print("Hubo un cambio!")
-                if playerPos in monstersPaths[i]:
-                    #print("Quitando el ultimo: " + str(monstersPaths[i][len(monstersPaths[i]) - 1]))
-                    monstersPaths[i].remove(monstersPaths[i][len(monstersPaths[i]) - 1])                    
-                else:
-                    #print("Anadiendo playerPos: " + str(playerPos))
-                    monstersPaths[i].append(playerPos)
-        
-            # Chequeo si ya esta en el primer nodo de su camino para quitar ese nodo
-            if monstersPaths[i][0] == monsterPos:
-                monstersPaths[i].remove(monstersPaths[i][0])
-                    
-        
         path = getPathTo(monsterPos, playerPos, [], [], [], 0)
         
         if path == True or path == False:
@@ -2043,7 +1972,7 @@ def tickMonsters():
             return
        
         # Obtenemos el vector de movimiento
-        mVector = getMovementVector(monstersPaths[i], math.floor(mX[i]), math.floor(mY[i])) 
+        mVector = getMovementVector(path, math.floor(mX[i]), math.floor(mY[i])) 
         
         # Evitar que queden abajito al subir       
         if mY[i] > math.floor(mY[i]) and mVector[0] != 0:
@@ -2254,153 +2183,6 @@ def renderUserMenu():
     # Pintamos el mensaje
     drawString (9, 26, infoMessage, "Consolas", getColor("red"), 40)
     resetInfoMessage()
-    
-
-# =====================================================================================
-# =====================================================================================
-# ================================== Otros Menus ======================================
-# =====================================================================================
-# =====================================================================================
-
-def getHighscores(level):
-    # Devolveremos un arreglo de strings
-    usernames = []
-    highscores = []
-    
-    # Si queremos los highscores globales
-    if level == "T":
-        # Recorremos todos los usuarios
-        for user in users:
-            # Pegamos el nombre y un nuevo puntaje
-            usernames.append(user[0][0])
-            highscores.append(0)
-            # Recorremos todos los niveles
-            for lvl in user[1]:
-                # Recorremos todos los puntajes del nivel actual y guardamos el mayor
-                higher = 0
-                for pts in lvl:
-                    if int(pts) > higher:
-                        higher = int(pts)
-                # Luego que tengamos el puntaje mas alto de ese nivel, lo sumamos
-                highscores[len(highscores)-1] += higher
-    # Sino, es porque queremos de un nivel en especifico
-    # Entonces anadiremos todos los puntajes de todos los jugadores al arreglo, y despues sacaremos los mas grandes
-    else:
-        lvlWanted = int(level)
-        numberOfScoresFound = 0
-        # Recorremos todos los usuarios
-        for user in users:
-            # Pegamos el nombre y un nuevo puntaje
-            usernames.append(user[0][0])
-            highscores.append([])
-            # Recorremos todos los puntajes del nivel que quiero
-            for pts in user[1][lvlWanted-1]:
-                highscores[len(highscores)-1].append(int(pts))
-                numberOfScoresFound += 1
-        # Luego de haber anadido todos los puntajes de todos los usuarios
-        # Creamos unos auxiliares donde pegaremos lo que nos importa
-        newUsernames = []
-        newHighscores = []
-        # Haremos un for para mostrar 10 highscores
-        for i in range(0, numberOfScoresFound):     
-            # Solo queremos 10
-            if i >= 10:
-                break
-                   
-            # Creamos una variable para guardar el mas alto
-            higher = 0
-            # Y otra para el nombre
-            usernameNumber = -1
-            # Recorremos todos los usernames con sus highscores
-            for u in range(0, len(usernames)):
-                for k in range(0, len(highscores[u])):
-                    if highscores[u][k] > higher:
-                        higher = highscores[u][k]
-                        usernameNumber = u
-            # Luego de haber obtenido el puntaje mas alto con su usuario, sacamos ese puntaje
-            highscores[usernameNumber].remove(higher)
-            # Lo sumamos a nuestro arreglo BIEN
-            newUsernames.append(usernames[usernameNumber])
-            newHighscores.append(higher)         
-
-        usernames = newUsernames
-        highscores = newHighscores
-    
-    return (usernames, highscores)
-                
-    
-    
-
-def renderHighscores():
-    drawString(1, 2, "Presiona 1,2,3,4,5,6,7,8,T para ver los puntajes", "Consolas", getColor("cyan"), 29)
-    usernames, highscores = getHighscores(actualHighscore)
-    
-    # Pintamos el titulo
-    if actualHighscore == "T":
-        drawString(8, 5, "Altos puntajes globales", "Consolas", getColor("red"), 40)
-    else:
-        drawString(5, 5, "Altos puntajes del nivel: " + str(actualHighscore), "Consolas", getColor("red"), 40)
-    
-    drawString(6, 8, "Nombre", "Consolas", getColor("blue"), 30)
-    drawString(22, 8, "Puntaje", "Consolas", getColor("blue"), 30)
-    
-    yPaint = 10   
-    
-    # Pintamos cada puntuacion
-    for i in range(0, len(highscores)):
-        drawString(6, yPaint, str(usernames[i]), "Consolas", getColor("white"), 25)
-        drawString(22, yPaint, str(highscores[i]), "Consolas", getColor("white"), 25)
-        yPaint += 2
-        
-    
-    
-    
-def renderHowToPlay():
-    drawString(10, 2, "Como jugar?", "Consolas", getColor("white"), 70)
-    drawString(9, 8, "W,A,S,D o las flechas para moverte", "Consolas", getColor("white"), 25)
-    drawString(12, 11, "F para disparar pimienta", "Consolas", getColor("white"), 25)
-    drawString(10, 14, "Barra espaciadora para saltar", "Consolas", getColor("white"), 25)
-    drawString(16, 17, "P para pausar", "Consolas", getColor("white"), 25)
-    
-    drawString(2.8, 28.5, "Mas informacion en http://www.salazarseijas.com/burgertime", "Consolas", getColor("cyan"), 22)
-    
-
-def renderOtherMenus():
-    if isInHighscores:
-        renderHighscores()
-    elif isInHowToPlay:
-        renderHowToPlay()
-        
-    drawString(8.5, 28.5, "Presiona ESC para volver al menu principal", "Consolas", getColor("white"), 20)
-    
-def inputOtherMenus(e):
-    global isInMenu, isInHighscores, isInHowToPlay, actualHighscore
-    print(e)
-    if e == KEY_ESC:
-        isInMenu = True
-        isInHighscores = False
-        isInHowToPlay = False
-        
-    # Para lo de highscore actualHighscore
-    if e == KEY_T:
-        actualHighscore = "T"
-    elif e == KEY_1 or e == KEY_NUMPAD1:
-        actualHighscore = "1"
-    elif e == KEY_2 or e == KEY_NUMPAD2:
-        actualHighscore = "2"
-    elif e == KEY_3 or e == KEY_NUMPAD3:
-        actualHighscore = "3"
-    elif e == KEY_4 or e == KEY_NUMPAD4:
-        actualHighscore = "4"
-    elif e == KEY_5 or e == KEY_NUMPAD5:
-        actualHighscore = "5"
-    elif e == KEY_6 or e == KEY_NUMPAD6:
-        actualHighscore = "6"
-    elif e == KEY_7 or e == KEY_NUMPAD7:
-        actualHighscore = "7"
-    elif e == KEY_8 or e == KEY_NUMPAD8:
-        actualHighscore = "8"
-
 
 # =====================================================================================
 # =====================================================================================
@@ -2473,10 +2255,18 @@ def renderMenu():
         else:
             color = getColor("white")
         drawString(optionXCoords[i], optionYCoords[i], optionNames[i], "Consolas", color, 38)     
-
+    
+    #if selectedOption == MENU_SELECTUSER:
+    #    selectedOptionX = -120
+    #else:
+    #    selectedOptionX = 0
+    
+    #menuArrowCoords = [(260+selectedOptionX, selectedOptionY),
+    #                  (260+selectedOptionX, selectedOptionY+40),
+    #                  (300+selectedOptionX, selectedOptionY+20)]
+    #drawPolygon(menuArrowCoords, getColor("white")) 
     
     # Pintamos el usuario actual
-
     if userSelected[0][0] == "Login Failed":
         drawString(9, 28, "Usuario o clave incorrecta!", "Consolas", getColor("red"), 30)        
     elif userSelected[0][0] == "No Seleccionado":
@@ -2491,7 +2281,7 @@ def renderMenu():
     
 # Metodo para activar el teclado en modo Menu
 def inputMenu(e):
-    global isInHighscores, isInHowToPlay, selectedOptionY, selectedOption, enterPressed, isInMenu, isPlaying, isSelectingLevel, isInUserMenu,infoMessage, infoMessageTimer
+    global selectedOptionY, selectedOption, enterPressed, isInMenu, isPlaying, isSelectingLevel, isInUserMenu,infoMessage, infoMessageTimer
 
     # Movemos el cursor del menu segun sea la tecla
     if (e == KEY_DOWN or e == KEY_S or e == KEY_s) and (selectedOption > 1):
@@ -2514,13 +2304,7 @@ def inputMenu(e):
         elif selectedOption == MENU_SELECTUSER:
             isInMenu = False
             isInUserMenu = True    
-            infoMessage = ""   
-        elif selectedOption == MENU_HIGHSCORES:
-            isInMenu = False
-            isInHighscores = True     
-        elif selectedOption == MENU_HOWTOPLAY:
-            isInMenu = False
-            isInHowToPlay = True
+            infoMessage = ""        
         elif selectedOption == MENU_EXIT:
             sys.exit()
     
@@ -2538,8 +2322,8 @@ def inputMenu(e):
 def tickLevel():    
     global actualLevel, isPlaying, isInMenu
     
-    for p in range(0, len(breadTopPositions)):
-        x, y = breadTopPositions[p][0]
+    for p in range(0, len(breadPositions)):
+        x, y = breadPositions[p][0]
         
         if y < INGREDIENTS_FLOOR:
             return
@@ -2601,15 +2385,12 @@ def tick():
 # Input method (Aqui va a controlarse todo lo referente a el teclado/mouse)
 def input(e):   
     key = e.key 
-
     if isInMenu:
         inputMenu(key)
     elif isSelectingLevel:
         inputLevelSelection(key)
     elif isInUserMenu:
         inputUserMenu(e)
-    elif isInHighscores or isInHowToPlay:
-        inputOtherMenus(key)
     else:
         inputPlayer(key)       
         
@@ -2622,8 +2403,6 @@ def render():
         renderLevelSelection()
     elif isInUserMenu:
         renderUserMenu()
-    elif isInHighscores or isInHowToPlay:
-        renderOtherMenus()
     elif isPlaying:
         renderGame()
 
